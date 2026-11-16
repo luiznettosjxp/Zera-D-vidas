@@ -41,6 +41,12 @@ body{transition:background-color .5s,color .5s}
 #th{position:fixed;z-index:6;top:calc(env(safe-area-inset-top,0px) + 12px);right:14px;width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:18px;line-height:1;display:grid;place-items:center;backdrop-filter:blur(8px);transition:transform .5s,border-color .3s}
 #th:hover{border-color:var(--ac)}#th.sp{transform:rotate(360deg)}
 .off{opacity:.45}
+.x.ed{font-size:15px}.x.ed:hover{color:var(--ac);transform:none}
+details.bk{margin-top:40px;border-top:1px solid var(--line);padding-top:16px;opacity:.6;transition:opacity .3s}
+details.bk[open],details.bk:hover{opacity:1}
+details.bk summary{cursor:pointer;color:var(--mute);font:500 11px/1 "Barlow Condensed",Barlow,sans-serif;letter-spacing:.2em;text-transform:uppercase;list-style:none}
+details.bk summary::-webkit-details-marker{display:none}
+details.bk summary::after{content:" +"}details.bk[open] summary::after{content:" −"}
 input:focus,select:focus{outline:0;border-bottom-color:var(--ac)}
 button:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 input::placeholder{color:var(--mute);opacity:.6}
@@ -97,6 +103,21 @@ let tab='res',last='';
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
 const tabs=[['res','','Resumo'],['gas','','Gastos'],['ext','','Extras'],['div','','Dívidas'],['pla','','Plano']];
 const sum=(a,f)=>a.reduce((s,x)=>s+f(x),0);
+const fm2=v=>v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const NM=id=>parseFloat(document.getElementById(id).value.replace(/\./g,'').replace(',','.'))||0;
+const esc=x=>String(x==null?'':x).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+document.addEventListener('input',e=>{const t=e.target;if(t.classList&&t.classList.contains('money')){const n=parseInt(t.value.replace(/\D/g,'')||'0',10);t.value=n?fm2(n/100):''}});
+const MES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+function mp(id,val,opt){const[y,m]=(val||'').split('-');const y0=new Date().getFullYear(),a0=Math.min(y0,+y||y0);
+ return `<div class="g2"><select id="${id}m" aria-label="Mês">${opt?'<option value="">—</option>':''}${MES.map((n,i)=>{const v=String(i+1).padStart(2,'0');return `<option value="${v}" ${v===m?'selected':''}>${n}</option>`}).join('')}</select><select id="${id}y" aria-label="Ano">${opt?'<option value="">—</option>':''}${Array.from({length:y0-a0+12},(_,i)=>a0+i).map(a=>`<option ${String(a)===y?'selected':''}>${a}</option>`).join('')}</select></div>`}
+const gp=id=>{const m=document.getElementById(id+'m').value,y=document.getElementById(id+'y').value;return m&&y?y+'-'+m:''};
+let E=null;
+const ed=k=>E&&E.k===k?S[k][E.i]:null;
+function edit(k,i){E={k,i};view();setTimeout(()=>{const f=document.getElementById('f-'+k);if(f)f.scrollIntoView({behavior:'smooth',block:'center'})},60)}
+function put(k,o){if(E&&E.k===k)S[k][E.i]=o;else S[k].push(o);E=null;save();view()}
+const btns=(k,add)=>`<button class="btn" onclick="${({desp:'addD',ext:'addE',card:'addC',loan:'addL'})[k]}()">${ed(k)?'Salvar alteração':add}</button>${ed(k)?'<button class="btn" style="margin-top:10px" onclick="E=null;view()">Cancelar</button>':''}`;
+const ttl=(k,a,b)=>`<div class="m">${ed(k)?a:b}</div>`;
+const ebtn=(k,i)=>`<button class="x ed" aria-label="Editar" onclick="edit('${k}',${i})">✎</button>`;
 const ym=o=>{const d=new Date();d.setDate(1);d.setMonth(d.getMonth()+o);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')};
 const fm=s=>{const[y,m]=s.split('-');return new Date(+y,m-1,1).toLocaleDateString('pt-BR',{month:'short',year:'numeric'}).replace('.','')};
 const act=(d,o)=>!d.ate||d.ate>=ym(o);
@@ -127,14 +148,14 @@ function when(m){const d=new Date();d.setMonth(d.getMonth()+m);return d.toLocale
 
 function view(){
   applyTheme();const a=document.getElementById('app');
-  document.getElementById('nav').innerHTML=tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';view();scrollTo(0,0)">${t[2]}</button>`).join('');
+  document.getElementById('nav').innerHTML=tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';E=null;view();scrollTo(0,0)">${t[2]}</button>`).join('');
   a.innerHTML=({res:vRes,gas:vGas,ext:vExt,div:vDiv,pla:vPla})[tab]();
   const fresh=tab!==last;last=tab;a.classList.toggle('in',fresh);
   if(fresh){[...a.children].forEach((e,i)=>e.style.setProperty('--i',i));count(a)}
 }
 function count(a){a.querySelectorAll('[data-n],[data-t]').forEach(el=>{const m=el.dataset.n!==undefined,v=+(m?el.dataset.n:el.dataset.t);const f=x=>m?R(x):'T−'+Math.round(x);const t0=performance.now();const st=n=>{const k=Math.min(1,(n-t0)/1000),e=1-Math.pow(1-k,3);el.textContent=f(v*e);if(k<1)requestAnimationFrame(st)};requestAnimationFrame(st)})}
 const msg=t=>{const e=document.getElementById('bkm');if(e)e.textContent=t};
-async function bk(){const j=JSON.stringify(S);try{await navigator.clipboard.writeText(j);msg('Backup copiado. Cole em suas notas ou envie para você mesmo.')}catch(e){document.getElementById('bkt').value=j;msg('Copie o texto do campo acima.')}}
+async function bk(){const j=JSON.stringify(S);try{await navigator.clipboard.writeText(j);msg('Backup copiado. Cole em suas notas ou envie para você mesmo.')}catch(e){document.getElementById('bkt').value=j;document.getElementById('bkt').closest('details').open=true;msg('Copie o texto do campo acima.')}}
 function rs(){try{const o=JSON.parse(T('bkt'));if(!Array.isArray(o.desp))throw 0;S=Object.assign(DEF(),o);save();view();}catch(e){msg('Backup inválido. Cole o texto completo.')}}
 
 function vRes(){
@@ -145,62 +166,62 @@ function vRes(){
   <div class="bar"><i style="width:${w(f)}%;background:var(--ink)"></i><i style="width:${w(c)}%;background:var(--ac)"></i><i style="width:${w(p)}%;background:var(--mute)"></i></div>
   <div class="lg"><span><b style="background:var(--ink)"></b>Despesas ${R(f)}</span><span><b style="background:var(--ac)"></b>Cartões ${R(c)}</span><span><b style="background:var(--mute)"></b>Empréstimos ${R(p)}</span></div></div>
   <div class="c"><label for="renda" style="margin-top:0">Renda mensal líquida (R$)</label>
-  <input id="renda" inputmode="decimal" value="${S.renda||''}" placeholder="0,00" onchange="S.renda=N('renda');save();view()">
+  <input id="renda" class="money" inputmode="numeric" value="${S.renda?fm2(S.renda):''}" placeholder="0,00" onchange="S.renda=NM('renda');save();view()">
   ${ex>0?`<div class="row" style="margin-top:10px"><span>Dinheiro extra neste mês</span><b class="ok">+ ${R(ex)}</b></div>`:''}
   <div class="row" style="margin-top:10px"><span>Sobra (ou falta) no fim do mês</span><b class="${sob>=0?'ok':'bad'}">${R(sob)}</b></div>
   <div class="row"><span class="m">Comprometimento da renda</span><b>${base>0?Math.round(t/base*100)+'%':'–'}</b></div></div>
   ${base>0&&sob<0?`<div class="tip w">Você vai fechar o mês com <b>${R(-sob)}</b> a menos do que precisa. Veja o plano para saber o que cortar ou renegociar.</div>`:''}
   ${t===0?`<div class="tip">Comece cadastrando suas despesas em <b>Gastos</b> e suas faturas e empréstimos em <b>Dívidas</b>.</div>`:''}
   <button class="btn" onclick="tab='pla';view()">Ver plano para zerar as dívidas</button>
-  <h2>Backup dos dados</h2>
-  <div class="c"><div class="m" style="text-transform:none;letter-spacing:0;font:300 14px Barlow,sans-serif">Seus dados ficam salvos neste aparelho. Copie um backup para não perder se limpar o navegador ou trocar de celular.</div>
+  <details class="bk"><summary>Backup dos dados</summary>
+  <div style="padding-top:14px"><div class="m">Seus dados ficam salvos neste aparelho. Copie um backup para não perder se limpar o navegador ou trocar de celular.</div>
   <textarea id="bkt" placeholder="Cole aqui um backup para restaurar"></textarea>
   <div class="g2"><button class="btn" onclick="bk()">Copiar backup</button><button class="btn" onclick="rs()">Restaurar</button></div>
-  <div class="m" id="bkm" style="margin-top:12px"></div></div>`;
+  <div class="m" id="bkm" style="margin-top:12px"></div></div></details>`;
 }
 function vGas(){
-  const cur=ym(0);
+  const cur=ym(0),e=ed('desp')||{};
   return `<h1>Despesas do mês</h1>
-  <div class="c">${S.desp.length?S.desp.map((d,i)=>`<div class="row ${act(d,0)?'':'off'}"><div>${d.n}<div class="m">${d.t==='f'?'Fixa':'Variável'} · ${d.ate?(d.ate<cur?'encerrada em '+fm(d.ate):'até '+fm(d.ate)):'sem data final'}</div></div><div><b>${R(d.v)}</b><button class="x" aria-label="Remover" onclick="S.desp.splice(${i},1);save();view()">×</button></div></div>`).join('')+`<div class="row"><b>Total neste mês</b><b>${R(fixed())}</b></div>`:'<div class="m">Nenhuma despesa ainda. Adicione aluguel, mercado, luz, transporte…</div>'}</div>
-  <div class="c"><label for="dn" style="margin-top:0">Nome</label><input id="dn" placeholder="Ex.: Aluguel">
-  <div class="g2"><div><label for="dv">Valor (R$)</label><input id="dv" inputmode="decimal" placeholder="0,00"></div>
-  <div><label for="dt">Tipo</label><select id="dt"><option value="f">Fixa</option><option value="v">Variável</option></select></div></div>
-  <label for="da">Termina em (opcional)</label><input id="da" type="month" min="${cur}">
-  <div class="m" style="margin-top:6px">Deixe em branco se a despesa não tem data para acabar.</div>
-  <button class="btn" onclick="addD()">Adicionar despesa</button></div>`;
+  <div class="c">${S.desp.length?S.desp.map((d,i)=>`<div class="row ${act(d,0)?'':'off'}"><div>${esc(d.n)}<div class="m">${d.t==='f'?'Fixa':'Variável'} · ${d.ate?(d.ate<cur?'encerrada em '+fm(d.ate):'até '+fm(d.ate)):'sem data final'}</div></div><div><b>${R(d.v)}</b>${ebtn('desp',i)}<button class="x" aria-label="Remover" onclick="S.desp.splice(${i},1);E=null;save();view()">×</button></div></div>`).join('')+`<div class="row"><b>Total neste mês</b><b>${R(fixed())}</b></div>`:'<div class="m">Nenhuma despesa ainda. Adicione aluguel, mercado, luz, transporte…</div>'}</div>
+  <div class="c" id="f-desp">${ttl('desp','Editando despesa','Nova despesa')}<label for="dn">Nome</label><input id="dn" placeholder="Ex.: Aluguel" value="${esc(e.n)}">
+  <div class="g2"><div><label for="dv">Valor (R$)</label><input id="dv" class="money" inputmode="numeric" placeholder="0,00" value="${e.v?fm2(e.v):''}"></div>
+  <div><label for="dt">Tipo</label><select id="dt"><option value="f" ${e.t!=='v'?'selected':''}>Fixa</option><option value="v" ${e.t==='v'?'selected':''}>Variável</option></select></div></div>
+  <label>Termina em (opcional)</label>${mp('da',e.ate,1)}
+  <div class="m" style="margin-top:8px">Deixe "—" se a despesa não tem data para acabar.</div>
+  ${btns('desp','Adicionar despesa')}</div>`;
 }
-function addD(){const n=T('dn'),v=N('dv'),a=document.getElementById('da').value;if(!n||v<=0)return;S.desp.push({n,v,t:document.getElementById('dt').value,ate:a||''});save();view()}
+function addD(){const n=T('dn'),v=NM('dv');if(!n||v<=0)return;put('desp',{n,v,t:document.getElementById('dt').value,ate:gp('da')})}
 function vExt(){
-  const L=S.ext.map((e,i)=>({...e,i})).sort((a,b)=>a.m<b.m?-1:1),cur=ym(0);
+  const L=S.ext.map((x,i)=>({...x,i})).sort((a,b)=>a.m<b.m?-1:1),cur=ym(0),e=ed('ext')||{};
   return `<h1>Dinheiro extra</h1>
-  <div class="c">${L.length?L.map(e=>`<div class="row ${e.m<cur?'off':''}"><div>${e.n}<div class="m">${e.m<cur?'recebido em ':'previsto para '}${fm(e.m)}</div></div><div><b class="ok">+ ${R(e.v)}</b><button class="x" aria-label="Remover" onclick="S.ext.splice(${e.i},1);save();view()">×</button></div></div>`).join('')+`<div class="row"><b>Total a receber</b><b class="ok">${R(sum(L.filter(e=>e.m>=cur),e=>e.v))}</b></div>`:'<div class="m">Nenhum valor extra cadastrado. Inclua 13º, bônus, restituição, venda de algo…</div>'}</div>
-  <div class="c"><label for="en" style="margin-top:0">Origem</label><input id="en" placeholder="Ex.: 13º salário">
-  <div class="g2"><div><label for="ev">Valor (R$)</label><input id="ev" inputmode="decimal" placeholder="0,00"></div>
-  <div><label for="em">Mês que recebe</label><input id="em" type="month" value="${cur}" min="${cur}"></div></div>
-  <button class="btn" onclick="addE()">Adicionar dinheiro extra</button></div>
+  <div class="c">${L.length?L.map(x=>`<div class="row ${x.m<cur?'off':''}"><div>${esc(x.n)}<div class="m">${x.m<cur?'recebido em ':'previsto para '}${fm(x.m)}</div></div><div><b class="ok">+ ${R(x.v)}</b>${ebtn('ext',x.i)}<button class="x" aria-label="Remover" onclick="S.ext.splice(${x.i},1);E=null;save();view()">×</button></div></div>`).join('')+`<div class="row"><b>Total a receber</b><b class="ok">${R(sum(L.filter(x=>x.m>=cur),x=>x.v))}</b></div>`:'<div class="m">Nenhum valor extra cadastrado. Inclua 13º, bônus, restituição, venda de algo…</div>'}</div>
+  <div class="c" id="f-ext">${ttl('ext','Editando dinheiro extra','Novo dinheiro extra')}<label for="en">Origem</label><input id="en" placeholder="Ex.: 13º salário" value="${esc(e.n)}">
+  <label for="ev">Valor (R$)</label><input id="ev" class="money" inputmode="numeric" placeholder="0,00" value="${e.v?fm2(e.v):''}">
+  <label>Mês que recebe</label>${mp('em',e.m||cur,0)}
+  ${btns('ext','Adicionar dinheiro extra')}</div>
   <p class="m">O valor entra na renda do mês escolhido e é usado no plano para quitar a dívida mais cara.</p>`;
 }
-function addE(){const n=T('en'),v=N('ev'),m=document.getElementById('em').value;if(!n||v<=0||!m)return;S.ext.push({n,v,m});save();view()}
+function addE(){const n=T('en'),v=NM('ev'),m=gp('em');if(!n||v<=0||!m)return;put('ext',{n,v,m})}
 function vDiv(){
+  const c=ed('card')||{},l=ed('loan')||{};
   return `<h1>Cartões e empréstimos</h1>
   <h2>Cartões de crédito</h2>
-  <div class="c">${S.card.length?S.card.map((c,i)=>`<div class="row"><div>${c.n}<div class="m">juros ${c.j}% ao mês</div></div><div><b>${R(c.v)}</b><button class="x" aria-label="Remover" onclick="S.card.splice(${i},1);save();view()">×</button></div></div>`).join(''):'<div class="m">Nenhum cartão cadastrado.</div>'}
-  <label for="cn">Nome do cartão</label><input id="cn" placeholder="Ex.: Nubank">
-  <div class="g2"><div><label for="cv">Fatura atual (R$)</label><input id="cv" inputmode="decimal" placeholder="0,00"></div>
-  <div><label for="cj">Juros rotativo (% mês)</label><input id="cj" inputmode="decimal" value="14"></div></div>
-  <button class="btn" onclick="addC()">Adicionar cartão</button></div>
+  <div class="c">${S.card.length?S.card.map((x,i)=>`<div class="row"><div>${esc(x.n)}<div class="m">juros ${x.j}% ao mês</div></div><div><b>${R(x.v)}</b>${ebtn('card',i)}<button class="x" aria-label="Remover" onclick="S.card.splice(${i},1);E=null;save();view()">×</button></div></div>`).join(''):'<div class="m">Nenhum cartão cadastrado.</div>'}</div>
+  <div class="c" id="f-card">${ttl('card','Editando cartão','Novo cartão')}<label for="cn">Nome do cartão</label><input id="cn" placeholder="Ex.: Nubank" value="${esc(c.n)}">
+  <div class="g2"><div><label for="cv">Fatura atual (R$)</label><input id="cv" class="money" inputmode="numeric" placeholder="0,00" value="${c.v?fm2(c.v):''}"></div>
+  <div><label for="cj">Juros rotativo (% mês)</label><input id="cj" inputmode="decimal" value="${c.j!=null?c.j:14}"></div></div>
+  ${btns('card','Adicionar cartão')}</div>
   <h2>Empréstimos e financiamentos</h2>
-  <div class="c">${S.loan.length?S.loan.map((l,i)=>`<div class="row"><div>${l.n}<div class="m">${l.q} parcelas · juros ${l.j}% ao mês${l.s>0?' · saldo '+R(l.s):''}</div></div><div><b>${R(l.p)}</b><button class="x" aria-label="Remover" onclick="S.loan.splice(${i},1);save();view()">×</button></div></div>`).join(''):'<div class="m">Nenhum empréstimo cadastrado.</div>'}
-  <label for="ln">Nome</label><input id="ln" placeholder="Ex.: Empréstimo pessoal">
-  <div class="g2"><div><label for="lp">Parcela mensal (R$)</label><input id="lp" inputmode="decimal" placeholder="0,00"></div>
-  <div><label for="lq">Parcelas restantes</label><input id="lq" inputmode="numeric" placeholder="12"></div>
-  <div><label for="lj">Juros (% mês)</label><input id="lj" inputmode="decimal" value="4"></div>
-  <div><label for="ls">Saldo devedor (opcional)</label><input id="ls" inputmode="decimal" placeholder="0,00"></div></div>
-  <button class="btn" onclick="addL()">Adicionar empréstimo</button></div>`;
+  <div class="c">${S.loan.length?S.loan.map((x,i)=>`<div class="row"><div>${esc(x.n)}<div class="m">${x.q} parcelas · juros ${x.j}% ao mês${x.s>0?' · saldo '+R(x.s):''}</div></div><div><b>${R(x.p)}</b>${ebtn('loan',i)}<button class="x" aria-label="Remover" onclick="S.loan.splice(${i},1);E=null;save();view()">×</button></div></div>`).join(''):'<div class="m">Nenhum empréstimo cadastrado.</div>'}</div>
+  <div class="c" id="f-loan">${ttl('loan','Editando empréstimo','Novo empréstimo')}<label for="ln">Nome</label><input id="ln" placeholder="Ex.: Empréstimo pessoal" value="${esc(l.n)}">
+  <div class="g2"><div><label for="lp">Parcela mensal (R$)</label><input id="lp" class="money" inputmode="numeric" placeholder="0,00" value="${l.p?fm2(l.p):''}"></div>
+  <div><label for="lq">Parcelas restantes</label><input id="lq" inputmode="numeric" placeholder="12" value="${l.q||''}"></div>
+  <div><label for="lj">Juros (% mês)</label><input id="lj" inputmode="decimal" value="${l.j!=null?l.j:4}"></div>
+  <div><label for="ls">Saldo devedor (opcional)</label><input id="ls" class="money" inputmode="numeric" placeholder="0,00" value="${l.s?fm2(l.s):''}"></div></div>
+  ${btns('loan','Adicionar empréstimo')}</div>`;
 }
-function addC(){const n=T('cn'),v=N('cv'),j=N('cj');if(!n||v<=0)return;S.card.push({n,v,j});save();view()}
-function addL(){const n=T('ln'),p=N('lp'),q=Math.round(N('lq')),j=N('lj'),s=N('ls');if(!n||p<=0||q<=0)return;S.loan.push({n,p,q,j,s});save();view()}
-
+function addC(){const n=T('cn'),v=NM('cv'),j=N('cj');if(!n||v<=0)return;put('card',{n,v,j})}
+function addL(){const n=T('ln'),p=NM('lp'),q=Math.round(N('lq')),j=N('lj'),s=NM('ls');if(!n||p<=0||q<=0)return;put('loan',{n,p,q,j,s})}
 function vPla(){
   if(!S.card.length&&!S.loan.length)return `<h1>Plano para zerar</h1><div class="tip">Cadastre ao menos um cartão ou empréstimo em <b>Dívidas</b> para ver o plano.</div>`;
   const ex=S.extra||0,r=sim(ex),debts=[...r.D].sort((a,b)=>b.r-a.r);
@@ -225,7 +246,7 @@ function vPla(){
   <div class="c"><div class="m">${r.ok?'Contagem regressiva':'Com a sua renda atual'}</div>
   ${r.ok?`<div class="big ok" data-t="${r.months}">T−${r.months}</div><div class="m" style="margin-top:6px">${r.months===1?'mês':'meses'} para dívida zero</div><div class="m">${when(r.months-1)} · juros totais estimados ${R(r.int)}</div>`:`<div class="big bad">Não fecha</div><div class="m">${r.deficit?'O orçamento não cobre os pagamentos mínimos.':'Mais de 30 anos para quitar nesse ritmo.'}</div>`}
   <label for="ex">Valor extra por mês para as dívidas (R$)</label>
-  <input id="ex" inputmode="decimal" value="${ex||''}" placeholder="0,00" onchange="S.extra=N('ex');save();view()">
+  <input id="ex" class="money" inputmode="numeric" value="${ex?fm2(ex):''}" placeholder="0,00" onchange="S.extra=NM('ex');save();view()">
   <div class="row" style="margin-top:10px"><span class="m">Disponível este mês para dívidas</span><b>${R(r.B)}</b></div></div>
   <h2>Ordem de pagamento</h2>
   <div class="c">${debts.map((d,i)=>`<div class="row"><div>${i+1}. ${d.n}<div class="m">juros ${d.r}% ao mês</div></div><b>${d.done?'quita em '+d.done+(d.done===1?' mês':' meses'):'não quita'}</b></div>`).join('')}</div>
