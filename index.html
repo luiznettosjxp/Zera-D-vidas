@@ -95,7 +95,9 @@ nav button{transition:color .25s,border-color .25s}
 const K='zera_dividas_v1';
 const DEF=()=>({renda:0,diaRec:0,extra:0,theme:'auto',desp:[],card:[],loan:[],ext:[],par:[]});let S=DEF();
 try{const x=localStorage.getItem(K);if(x)S=Object.assign(S,JSON.parse(x))}catch(e){}
-function fixIds(){S.card.forEach((c,i)=>{if(!c.id)c.id='c'+i});if(!Array.isArray(S.par))S.par=[]}
+function fixIds(){S.card.forEach((c,i)=>{if(!c.id)c.id='c'+i});if(!Array.isArray(S.par))S.par=[];
+  const old=S.par.filter(x=>!x.m&&x.p&&x.q);if(old.length){S.par=S.par.filter(x=>x.m);
+   old.forEach(x=>{for(let o=1;o<=x.q;o++){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()+o);S.par.push({k:x.k,m:d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'),v:x.p})}})}}
 fixIds();
 const saveQ=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
 const save=()=>{S.upd=Math.max(Date.now(),(S.upd||0)+1);saveQ();qs()};
@@ -184,9 +186,9 @@ function agenda(){
 const inN=n=>n===0?'hoje':n===1?'amanhã':'em '+n+' dias';
 const cards=()=>sum(S.card,c=>c.v);
 const parc=()=>sum(S.loan,l=>l.p);
-const parM=o=>o>=1?sum(S.par.filter(x=>x.q>=o),x=>x.p):0;
-const parTot=()=>sum(S.par,x=>x.p*x.q);
-const cpx=c=>{const L=S.par.filter(x=>x.k===c.id);return L.length?`<div class="m">+ ${R(sum(L,x=>x.p))} por mês em parcelas futuras (${R(sum(L,x=>x.p*x.q))} no total)</div>`:''};
+const parM=o=>o>=1?sum(S.par.filter(x=>x.m===ym(o)),x=>x.v):0;
+const parTot=()=>sum(S.par.filter(x=>x.m>=ym(1)),x=>x.v);
+const cpx=c=>{const L=S.par.filter(x=>x.k===c.id&&x.m>=ym(1));return L.length?`<div class="m">+ ${R(sum(L,x=>x.v))} em parcelas futuras (${L.length} ${L.length===1?'mês':'meses'})</div>`:''};
 const total=()=>fixed()+cards()+parc();
 
 function sim(ex){
@@ -296,19 +298,22 @@ function vDiv(){
 }
 function addC(){const n=T('cn'),v=NM('cv'),j=N('cj');if(!n||v<=0)return;const o=ed('card');put('card',{n,v,j,f:DD('cf'),d:DD('cd'),id:(o&&o.id)||'c'+Date.now().toString(36)})}
 function rmC(i){const id=S.card[i].id;S.par=S.par.filter(x=>x.k!==id);S.card.splice(i,1);E=null;save();view()}
-function addP(){const n=T('pn'),p=NM('pv'),q=Math.min(120,Math.round(N('pq'))),k=(document.getElementById('pk')||{}).value;if(!n||p<=0||q<=0||!k)return;put('par',{n,k,p,q})}
+function addP(){const m=gp('pm'),v=NM('pv'),k=(document.getElementById('pk')||{}).value;if(!m||v<=0||!k)return;
+  if(!ed('par')){const i=S.par.findIndex(x=>x.k===k&&x.m===m);if(i>=0)E={k:'par',i}}
+  put('par',{k,m,v})}
 function vPar(){
-  const p=ed('par')||{},cn=id=>{const c=S.card.find(x=>x.id===id);return c?c.n:'—'};
-  const last=Math.min(12,Math.max(0,...S.par.map(x=>x.q)));const proj=Array.from({length:last},(_,i)=>i+1);
+  const p=ed('par')||{},cn=id=>{const c=S.card.find(x=>x.id===id);return c?c.n:'—'},c1=ym(1);
+  const L=S.par.map((x,i)=>({...x,i})).filter(x=>x.m>=c1).sort((a,b)=>a.m<b.m?-1:a.m>b.m?1:cn(a.k)<cn(b.k)?-1:1);
+  const mons=[];if(L.length){let o=1;while(ym(o)<=L[L.length-1].m&&o<=36){mons.push(o);o++}}
   return `<h2>Parcelas futuras nos cartões</h2>
-  <div class="c">${S.par.length?S.par.map((x,i)=>`<div class="row"><div>${esc(x.n)}<div class="m">${esc(cn(x.k))} · ${x.q}× ${R(x.p)} · restam ${R(x.p*x.q)}</div></div><div><b>${R(x.p)}</b>${ebtn('par',i)}<button class="x" aria-label="Remover" onclick="S.par.splice(${i},1);E=null;save();view()">×</button></div></div>`).join('')+`<div class="row"><b>Total já comprometido</b><b>${R(parTot())}</b></div>`:'<div class="m">Nenhuma parcela futura cadastrada.</div>'}</div>
-  ${S.par.length?`<div class="c"><table><tr><th>Mês</th><th>Parcelas</th><th>Da renda</th></tr>${proj.map(o=>{const v=parM(o);return `<tr><td>${fm(ym(o))}</td><td>${R(v)}</td><td>${S.renda>0?Math.round(v/S.renda*100)+'%':'–'}</td></tr>`}).join('')}</table></div>`:''}
-  ${S.card.length?`<div class="c" id="f-par">${ttl('par','Editando parcela','Nova parcela futura')}<label for="pn">Compra</label><input id="pn" placeholder="Ex.: Celular" value="${esc(p.n)}">
+  <div class="c">${L.length?L.map(x=>`<div class="row"><div>${fm(x.m)}<div class="m">${esc(cn(x.k))}</div></div><div><b>${R(x.v)}</b>${ebtn('par',x.i)}<button class="x" aria-label="Remover" onclick="S.par.splice(${x.i},1);E=null;save();view()">×</button></div></div>`).join('')+`<div class="row"><b>Total já comprometido</b><b>${R(parTot())}</b></div>`:'<div class="m">Nenhuma parcela futura cadastrada.</div>'}</div>
+  ${L.length?`<div class="c"><table><tr><th>Mês</th><th>Parcelas</th><th>Da renda</th></tr>${mons.map(o=>{const v=parM(o);return `<tr><td>${fm(ym(o))}</td><td>${R(v)}</td><td>${S.renda>0?Math.round(v/S.renda*100)+'%':'–'}</td></tr>`}).join('')}</table></div>`:''}
+  ${S.card.length?`<div class="c" id="f-par">${ttl('par','Editando parcela do mês','Parcelas de um mês')}
   <label for="pk">Cartão</label><select id="pk">${S.card.map(c=>`<option value="${esc(c.id)}" ${c.id===p.k?'selected':''}>${esc(c.n)}</option>`).join('')}</select>
-  <div class="g2"><div><label for="pv">Valor da parcela (R$)</label><input id="pv" class="money" inputmode="numeric" placeholder="0,00" value="${p.p?fm2(p.p):''}"></div>
-  <div><label for="pq">Parcelas restantes</label><input id="pq" inputmode="numeric" placeholder="6" value="${p.q||''}"></div></div>
-  <div class="m" style="margin-top:8px">Conte só as parcelas que ainda vão cair nas próximas faturas, sem a fatura atual.</div>
-  ${btns('par','Adicionar parcela')}</div>`:'<div class="m">Cadastre um cartão acima para lançar parcelas futuras.</div>'}`;
+  <label>Mês da fatura</label>${mp('pm',p.m||c1,0)}
+  <label for="pv">Total de parcelas neste mês (R$)</label><input id="pv" class="money" inputmode="numeric" placeholder="0,00" value="${p.v?fm2(p.v):''}">
+  <div class="m" style="margin-top:8px">Some o que já está comprometido naquele mês neste cartão. Se lançar o mesmo cartão e mês de novo, o valor é substituído.</div>
+  ${btns('par','Adicionar mês')}</div>`:'<div class="m">Cadastre um cartão acima para lançar parcelas futuras.</div>'}`;
 }
 function addL(){const n=T('ln'),p=NM('lp'),q=Math.round(N('lq')),j=N('lj'),s=NM('ls');if(!n||p<=0||q<=0)return;put('loan',{n,p,q,j,s,d:DD('ld')})}
 function vPla(){
@@ -326,7 +331,7 @@ function vPla(){
   if(big&&big.j>=3)tips.push(['',`Peça portabilidade do <b>${big.n}</b> para outro banco com taxa menor e renegocie o saldo. Em feirões de renegociação os descontos podem ser altos.`]);
   const fe=S.ext.filter(e=>e.m>=ym(0));
   if(fe.length)tips.push(['',`Seu dinheiro extra (${R(sum(fe,e=>e.v))}) entra no plano no mês em que for recebido e vai direto para a dívida mais cara.`]);
-  if(S.par.length)tips.push(['',`Você já tem <b>${R(parTot())}</b> em parcelas futuras nos cartões, descontadas do plano mês a mês. Evite novas compras parceladas até quitar.`]);
+  if(S.par.length)tips.push(['',`Você já tem <b>${R(parTot())}</b> em parcelas futuras nos cartões, descontadas do plano em cada mês. Evite novas compras parceladas até quitar.`]);
   const endD=S.desp.filter(d=>d.ate&&d.ate>=ym(0)).sort((a,b)=>a.ate<b.ate?-1:1)[0];
   if(endD)tips.push(['',`Quando <b>${endD.n}</b> terminar em ${fm(endD.ate)}, ${R(endD.v)} por mês ficam livres. O plano já usa esse valor.`]);
   tips.push(['','Venda itens parados e use renda extra pontual para amortizar o saldo. Antecipar parcelas reduz os juros futuros.']);
