@@ -96,7 +96,7 @@ const K='zera_dividas_v1';
 const DEF=()=>({renda:0,diaRec:0,extra:0,theme:'auto',desp:[],card:[],loan:[],ext:[]});let S=DEF();
 try{const x=localStorage.getItem(K);if(x)S=Object.assign(S,JSON.parse(x))}catch(e){}
 const saveQ=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
-const save=()=>{S.upd=Date.now();saveQ();qs()};
+const save=()=>{S.upd=Math.max(Date.now(),(S.upd||0)+1);saveQ();qs()};
 /* ---- Sincronização entre aparelhos (gist privado do GitHub) ---- */
 const SK='zera_sync',FN='zera_dividas.json';
 let Y={tok:'',gid:'',at:0};try{Object.assign(Y,JSON.parse(localStorage.getItem(SK)||'{}'))}catch(e){}
@@ -111,14 +111,14 @@ async function findG(){for(let pg=1;pg<=5;pg++){const L=await gh('/gists?per_pag
 async function getR(){const g=await gh('/gists/'+Y.gid);const f=g.files&&g.files[FN];if(!f)return null;let t=f.content;if(f.truncated||t==null)t=await(await fetch(f.raw_url,{cache:'no-store'})).text();return JSON.parse(t)}
 const putR=()=>gh('/gists/'+Y.gid,{method:'PATCH',body:JSON.stringify({files:{[FN]:{content:pay()}}})});
 function applyR(r){const th=S.theme;S=Object.assign(DEF(),r);S.theme=th;saveQ();E=null}
-async function sync(){
+async function sync(man){
   if(!Y.tok)return;if(busy){again=true;return}
   busy=true;setSM('Sincronizando…');
   try{
     if(!Y.gid){Y.gid=await findG();saveY()}
     if(!Y.gid){const g=await gh('/gists',{method:'POST',body:JSON.stringify({description:'Zera Dívidas',public:false,files:{[FN]:{content:pay()}}})});Y.gid=g.id;saveY()}
     else{const r=await getR();
-      if(r&&(r.upd||0)>(S.upd||0)){applyR(r);view()}
+      if(r&&(r.upd||0)>(S.upd||0)){if(!man&&/INPUT|SELECT|TEXTAREA/.test((document.activeElement||{}).tagName||'')){busy=false;return}applyR(r);view()}
       else if(!r||(S.upd||0)>(r.upd||0))await putR()}
     Y.at=Date.now();saveY();setSM('Sincronizado às '+new Date(Y.at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
   }catch(e){setSM(e.message==='401'?'Token inválido ou sem permissão de gist.':'Sem conexão. Tente de novo depois.')}
@@ -137,7 +137,8 @@ async function conn(){
   await sync();view();
 }
 function disc(){Y={tok:'',gid:'',at:0};sm='';saveY();view()}
-addEventListener('visibilitychange',()=>{if(!document.hidden)sync()});addEventListener('online',()=>sync());
+addEventListener('visibilitychange',()=>{if(!document.hidden)sync()});addEventListener('online',()=>sync());addEventListener('focus',()=>sync());addEventListener('pageshow',()=>sync());
+setInterval(()=>{if(!document.hidden)sync()},15000);
 const R=v=>(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const N=id=>parseFloat(String(document.getElementById(id).value).replace(',','.'))||0;
 const T=id=>document.getElementById(id).value.trim();
@@ -231,7 +232,7 @@ function vRes(){
   <button class="btn" onclick="tab='pla';view()">Ver plano para zerar as dívidas</button>
   <details class="bk"${Y.tok?' open':''}><summary>Sincronizar aparelhos</summary>
   <div style="padding-top:14px">${Y.tok?`<div class="m">Conectado. As alterações são enviadas e baixadas automaticamente entre os seus aparelhos.</div>
-  <div class="g2"><button class="btn" onclick="sync()">Sincronizar agora</button><button class="btn" onclick="if(confirm('Desconectar este aparelho? Os dados dele continuam aqui.'))disc()">Desconectar</button></div>`:`<div class="m">Mantém o celular e o tablet iguais, usando um espaço privado na sua conta do GitHub.</div>
+  <div class="g2"><button class="btn" onclick="sync(true)">Sincronizar agora</button><button class="btn" onclick="if(confirm('Desconectar este aparelho? Os dados dele continuam aqui.'))disc()">Desconectar</button></div>`:`<div class="m">Mantém o celular e o tablet iguais, usando um espaço privado na sua conta do GitHub.</div>
   <div class="m" style="margin-top:10px">1. <a href="https://github.com/settings/tokens/new?scopes=gist&description=Zera%20D%C3%ADvidas" target="_blank" rel="noopener" style="color:var(--ac)">Criar o token</a> (em Expiration escolha "No expiration", role e confirme, copie o token).<br>2. Cole abaixo e toque em Conectar.<br>3. No outro aparelho, use o mesmo token.</div>
   <label for="syt">Token do GitHub</label><input id="syt" type="password" autocomplete="off" placeholder="ghp_…">
   <button class="btn" onclick="conn()">Conectar</button>`}
