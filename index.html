@@ -93,7 +93,7 @@ nav button{transition:color .25s,border-color .25s}
 <nav id="nav"></nav>
 <script>
 const K='zera_dividas_v1';
-const DEF=()=>({renda:0,extra:0,theme:'auto',desp:[],card:[],loan:[],ext:[]});let S=DEF();
+const DEF=()=>({renda:0,diaRec:0,extra:0,theme:'auto',desp:[],card:[],loan:[],ext:[]});let S=DEF();
 try{const x=localStorage.getItem(K);if(x)S=Object.assign(S,JSON.parse(x))}catch(e){}
 const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
 const R=v=>(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
@@ -126,6 +126,17 @@ const extraIn=(o=0)=>sum(S.ext.filter(e=>e.m===ym(o)),e=>e.v);
 const isDark=()=>!(S.theme==='light'||(S.theme!=='dark'&&matchMedia('(prefers-color-scheme: light)').matches));
 function applyTheme(){const r=document.documentElement;if(S.theme==='light'||S.theme==='dark')r.dataset.theme=S.theme;else delete r.dataset.theme;const d=isDark();r.style.colorScheme=d?'dark':'light';const b=document.getElementById('th');if(b)b.textContent=d?'☀':'☾';const m=document.querySelector('meta[name=theme-color]');if(m)m.content=d?'#06080B':'#F6F7F9'}
 function togTheme(){S.theme=isDark()?'light':'dark';save();applyTheme();const b=document.getElementById('th');b.classList.add('sp');setTimeout(()=>b.classList.remove('sp'),500)}
+const DD=id=>{const n=Math.round(N(id));return n>=1&&n<=31?n:0};
+const dayIn=v=>v?`value="${v}"`:'';
+function nxt(day){const t=new Date();t.setHours(0,0,0,0);const mk=(y,m)=>new Date(y,m,Math.min(day,new Date(y,m+1,0).getDate()));let d=mk(t.getFullYear(),t.getMonth());if(d<t)d=mk(t.getFullYear(),t.getMonth()+1);return{d,n:Math.round((d-t)/864e5)}}
+function agenda(){
+  const L=[];
+  if(S.diaRec)L.push({t:'Recebo a renda',day:S.diaRec,ok:1});
+  S.card.forEach(c=>{if(c.f)L.push({t:'Fecha a fatura · '+c.n,day:c.f});if(c.d)L.push({t:'Vence a fatura · '+c.n,day:c.d,w:1})});
+  S.loan.forEach(l=>{if(l.d)L.push({t:'Vence a parcela · '+l.n,day:l.d,w:1})});
+  return L.map(x=>({...x,...nxt(x.day)})).sort((a,b)=>a.n-b.n);
+}
+const inN=n=>n===0?'hoje':n===1?'amanhã':'em '+n+' dias';
 const cards=()=>sum(S.card,c=>c.v);
 const parc=()=>sum(S.loan,l=>l.p);
 const total=()=>fixed()+cards()+parc();
@@ -167,11 +178,14 @@ function vRes(){
   <div class="lg"><span><b style="background:var(--ink)"></b>Despesas ${R(f)}</span><span><b style="background:var(--ac)"></b>Cartões ${R(c)}</span><span><b style="background:var(--mute)"></b>Empréstimos ${R(p)}</span></div></div>
   <div class="c"><label for="renda" style="margin-top:0">Renda mensal líquida (R$)</label>
   <input id="renda" class="money" inputmode="numeric" value="${S.renda?fm2(S.renda):''}" placeholder="0,00" onchange="S.renda=NM('renda');save();view()">
+  <label for="drec">Dia do mês que eu recebo</label>
+  <input id="drec" inputmode="numeric" maxlength="2" placeholder="Ex.: 5" ${dayIn(S.diaRec)} onchange="S.diaRec=DD('drec');save();view()">
   ${ex>0?`<div class="row" style="margin-top:10px"><span>Dinheiro extra neste mês</span><b class="ok">+ ${R(ex)}</b></div>`:''}
   <div class="row" style="margin-top:10px"><span>Sobra (ou falta) no fim do mês</span><b class="${sob>=0?'ok':'bad'}">${R(sob)}</b></div>
   <div class="row"><span class="m">Comprometimento da renda</span><b>${base>0?Math.round(t/base*100)+'%':'–'}</b></div></div>
   ${base>0&&sob<0?`<div class="tip w">Você vai fechar o mês com <b>${R(-sob)}</b> a menos do que precisa. Veja o plano para saber o que cortar ou renegociar.</div>`:''}
   ${t===0?`<div class="tip">Comece cadastrando suas despesas em <b>Gastos</b> e suas faturas e empréstimos em <b>Dívidas</b>.</div>`:''}
+  ${(()=>{const A=agenda();return A.length?`<h2>Próximas datas</h2><div class="c">${A.map(x=>`<div class="row"><div>${x.t}<div class="m">dia ${x.day} · ${x.d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</div></div><b class="${x.ok?'ok':x.w&&x.n<=3?'bad':''}">${inN(x.n)}</b></div>`).join('')}</div>`:''})()}
   <button class="btn" onclick="tab='pla';view()">Ver plano para zerar as dívidas</button>
   <details class="bk"><summary>Backup dos dados</summary>
   <div style="padding-top:14px"><div class="m">Seus dados ficam salvos neste aparelho. Copie um backup para não perder se limpar o navegador ou trocar de celular.</div>
@@ -206,22 +220,25 @@ function vDiv(){
   const c=ed('card')||{},l=ed('loan')||{};
   return `<h1>Cartões e empréstimos</h1>
   <h2>Cartões de crédito</h2>
-  <div class="c">${S.card.length?S.card.map((x,i)=>`<div class="row"><div>${esc(x.n)}<div class="m">juros ${x.j}% ao mês</div></div><div><b>${R(x.v)}</b>${ebtn('card',i)}<button class="x" aria-label="Remover" onclick="S.card.splice(${i},1);E=null;save();view()">×</button></div></div>`).join(''):'<div class="m">Nenhum cartão cadastrado.</div>'}</div>
+  <div class="c">${S.card.length?S.card.map((x,i)=>`<div class="row"><div>${esc(x.n)}<div class="m">juros ${x.j}% ao mês${x.f?' · fecha dia '+x.f:''}${x.d?' · vence dia '+x.d:''}</div></div><div><b>${R(x.v)}</b>${ebtn('card',i)}<button class="x" aria-label="Remover" onclick="S.card.splice(${i},1);E=null;save();view()">×</button></div></div>`).join(''):'<div class="m">Nenhum cartão cadastrado.</div>'}</div>
   <div class="c" id="f-card">${ttl('card','Editando cartão','Novo cartão')}<label for="cn">Nome do cartão</label><input id="cn" placeholder="Ex.: Nubank" value="${esc(c.n)}">
   <div class="g2"><div><label for="cv">Fatura atual (R$)</label><input id="cv" class="money" inputmode="numeric" placeholder="0,00" value="${c.v?fm2(c.v):''}"></div>
-  <div><label for="cj">Juros rotativo (% mês)</label><input id="cj" inputmode="decimal" value="${c.j!=null?c.j:14}"></div></div>
+  <div><label for="cj">Juros rotativo (% mês)</label><input id="cj" inputmode="decimal" value="${c.j!=null?c.j:14}"></div>
+  <div><label for="cf">Dia que fecha a fatura</label><input id="cf" inputmode="numeric" maxlength="2" placeholder="Ex.: 25" ${dayIn(c.f)}></div>
+  <div><label for="cd">Dia do vencimento</label><input id="cd" inputmode="numeric" maxlength="2" placeholder="Ex.: 5" ${dayIn(c.d)}></div></div>
   ${btns('card','Adicionar cartão')}</div>
   <h2>Empréstimos e financiamentos</h2>
-  <div class="c">${S.loan.length?S.loan.map((x,i)=>`<div class="row"><div>${esc(x.n)}<div class="m">${x.q} parcelas · juros ${x.j}% ao mês${x.s>0?' · saldo '+R(x.s):''}</div></div><div><b>${R(x.p)}</b>${ebtn('loan',i)}<button class="x" aria-label="Remover" onclick="S.loan.splice(${i},1);E=null;save();view()">×</button></div></div>`).join(''):'<div class="m">Nenhum empréstimo cadastrado.</div>'}</div>
+  <div class="c">${S.loan.length?S.loan.map((x,i)=>`<div class="row"><div>${esc(x.n)}<div class="m">${x.q} parcelas · juros ${x.j}% ao mês${x.s>0?' · saldo '+R(x.s):''}${x.d?' · vence dia '+x.d:''}</div></div><div><b>${R(x.p)}</b>${ebtn('loan',i)}<button class="x" aria-label="Remover" onclick="S.loan.splice(${i},1);E=null;save();view()">×</button></div></div>`).join(''):'<div class="m">Nenhum empréstimo cadastrado.</div>'}</div>
   <div class="c" id="f-loan">${ttl('loan','Editando empréstimo','Novo empréstimo')}<label for="ln">Nome</label><input id="ln" placeholder="Ex.: Empréstimo pessoal" value="${esc(l.n)}">
   <div class="g2"><div><label for="lp">Parcela mensal (R$)</label><input id="lp" class="money" inputmode="numeric" placeholder="0,00" value="${l.p?fm2(l.p):''}"></div>
   <div><label for="lq">Parcelas restantes</label><input id="lq" inputmode="numeric" placeholder="12" value="${l.q||''}"></div>
   <div><label for="lj">Juros (% mês)</label><input id="lj" inputmode="decimal" value="${l.j!=null?l.j:4}"></div>
-  <div><label for="ls">Saldo devedor (opcional)</label><input id="ls" class="money" inputmode="numeric" placeholder="0,00" value="${l.s?fm2(l.s):''}"></div></div>
+  <div><label for="ls">Saldo devedor (opcional)</label><input id="ls" class="money" inputmode="numeric" placeholder="0,00" value="${l.s?fm2(l.s):''}"></div>
+  <div><label for="ld">Dia do vencimento</label><input id="ld" inputmode="numeric" maxlength="2" placeholder="Ex.: 10" ${dayIn(l.d)}></div></div>
   ${btns('loan','Adicionar empréstimo')}</div>`;
 }
-function addC(){const n=T('cn'),v=NM('cv'),j=N('cj');if(!n||v<=0)return;put('card',{n,v,j})}
-function addL(){const n=T('ln'),p=NM('lp'),q=Math.round(N('lq')),j=N('lj'),s=NM('ls');if(!n||p<=0||q<=0)return;put('loan',{n,p,q,j,s})}
+function addC(){const n=T('cn'),v=NM('cv'),j=N('cj');if(!n||v<=0)return;put('card',{n,v,j,f:DD('cf'),d:DD('cd')})}
+function addL(){const n=T('ln'),p=NM('lp'),q=Math.round(N('lq')),j=N('lj'),s=NM('ls');if(!n||p<=0||q<=0)return;put('loan',{n,p,q,j,s,d:DD('ld')})}
 function vPla(){
   if(!S.card.length&&!S.loan.length)return `<h1>Plano para zerar</h1><div class="tip">Cadastre ao menos um cartão ou empréstimo em <b>Dívidas</b> para ver o plano.</div>`;
   const ex=S.extra||0,r=sim(ex),debts=[...r.D].sort((a,b)=>b.r-a.r);
