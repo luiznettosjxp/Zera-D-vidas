@@ -95,7 +95,49 @@ nav button{transition:color .25s,border-color .25s}
 const K='zera_dividas_v1';
 const DEF=()=>({renda:0,diaRec:0,extra:0,theme:'auto',desp:[],card:[],loan:[],ext:[]});let S=DEF();
 try{const x=localStorage.getItem(K);if(x)S=Object.assign(S,JSON.parse(x))}catch(e){}
-const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
+const saveQ=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
+const save=()=>{S.upd=Date.now();saveQ();qs()};
+/* ---- Sincronização entre aparelhos (gist privado do GitHub) ---- */
+const SK='zera_sync',FN='zera_dividas.json';
+let Y={tok:'',gid:'',at:0};try{Object.assign(Y,JSON.parse(localStorage.getItem(SK)||'{}'))}catch(e){}
+const saveY=()=>{try{localStorage.setItem(SK,JSON.stringify(Y))}catch(e){}};
+let busy=false,again=false,pt=null,sm='';
+const setSM=t=>{sm=t;const e=document.getElementById('sym');if(e)e.textContent=t};
+const gh=async(p,o={})=>{const r=await fetch('https://api.github.com'+p,{cache:'no-store',...o,headers:{Authorization:'Bearer '+Y.tok,Accept:'application/vnd.github+json','Content-Type':'application/json'}});if(!r.ok)throw new Error(String(r.status));return r.json()};
+const pay=()=>{const o={...S};delete o.theme;return JSON.stringify(o)};
+const hasData=()=>S.renda>0||S.desp.length||S.card.length||S.loan.length||S.ext.length;
+function qs(){if(!Y.tok)return;clearTimeout(pt);pt=setTimeout(()=>sync(),1500)}
+async function findG(){for(let pg=1;pg<=5;pg++){const L=await gh('/gists?per_page=100&page='+pg);const g=L.find(x=>x.files&&x.files[FN]);if(g)return g.id;if(L.length<100)break}return ''}
+async function getR(){const g=await gh('/gists/'+Y.gid);const f=g.files&&g.files[FN];if(!f)return null;let t=f.content;if(f.truncated||t==null)t=await(await fetch(f.raw_url,{cache:'no-store'})).text();return JSON.parse(t)}
+const putR=()=>gh('/gists/'+Y.gid,{method:'PATCH',body:JSON.stringify({files:{[FN]:{content:pay()}}})});
+function applyR(r){const th=S.theme;S=Object.assign(DEF(),r);S.theme=th;saveQ();E=null}
+async function sync(){
+  if(!Y.tok)return;if(busy){again=true;return}
+  busy=true;setSM('Sincronizando…');
+  try{
+    if(!Y.gid){Y.gid=await findG();saveY()}
+    if(!Y.gid){const g=await gh('/gists',{method:'POST',body:JSON.stringify({description:'Zera Dívidas',public:false,files:{[FN]:{content:pay()}}})});Y.gid=g.id;saveY()}
+    else{const r=await getR();
+      if(r&&(r.upd||0)>(S.upd||0)){applyR(r);view()}
+      else if(!r||(S.upd||0)>(r.upd||0))await putR()}
+    Y.at=Date.now();saveY();setSM('Sincronizado às '+new Date(Y.at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
+  }catch(e){setSM(e.message==='401'?'Token inválido ou sem permissão de gist.':'Sem conexão. Tente de novo depois.')}
+  busy=false;if(again){again=false;sync()}
+}
+async function conn(){
+  const t=T('syt');if(!t){setSM('Cole o token primeiro.');return}
+  Y={tok:t,gid:'',at:0};saveY();setSM('Conectando…');
+  try{
+    Y.gid=await findG();saveY();
+    if(Y.gid){const r=await getR();
+      if(r&&(!hasData()||confirm('Já existe uma base na nuvem.\n\nOK = baixar a base da nuvem e SUBSTITUIR os dados deste aparelho.\nCancelar = enviar os dados deste aparelho e SUBSTITUIR a nuvem.')))applyR(r);
+      else{S.upd=Date.now();saveQ()}
+    }else if(!S.upd){S.upd=Date.now();saveQ()}
+  }catch(e){Y={tok:'',gid:'',at:0};saveY();setSM(e.message==='401'?'Token inválido ou sem permissão de gist.':'Não consegui conectar. Confira o token e a internet.');return}
+  await sync();view();
+}
+function disc(){Y={tok:'',gid:'',at:0};sm='';saveY();view()}
+addEventListener('visibilitychange',()=>{if(!document.hidden)sync()});addEventListener('online',()=>sync());
 const R=v=>(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const N=id=>parseFloat(String(document.getElementById(id).value).replace(',','.'))||0;
 const T=id=>document.getElementById(id).value.trim();
@@ -125,7 +167,7 @@ const fixed=(o=0)=>sum(S.desp.filter(d=>act(d,o)),d=>d.v);
 const extraIn=(o=0)=>sum(S.ext.filter(e=>e.m===ym(o)),e=>e.v);
 const isDark=()=>!(S.theme==='light'||(S.theme!=='dark'&&matchMedia('(prefers-color-scheme: light)').matches));
 function applyTheme(){const r=document.documentElement;if(S.theme==='light'||S.theme==='dark')r.dataset.theme=S.theme;else delete r.dataset.theme;const d=isDark();r.style.colorScheme=d?'dark':'light';const b=document.getElementById('th');if(b)b.textContent=d?'☀':'☾';const m=document.querySelector('meta[name=theme-color]');if(m)m.content=d?'#06080B':'#F6F7F9'}
-function togTheme(){S.theme=isDark()?'light':'dark';save();applyTheme();const b=document.getElementById('th');b.classList.add('sp');setTimeout(()=>b.classList.remove('sp'),500)}
+function togTheme(){S.theme=isDark()?'light':'dark';saveQ();applyTheme();const b=document.getElementById('th');b.classList.add('sp');setTimeout(()=>b.classList.remove('sp'),500)}
 const DD=id=>{const n=Math.round(N(id));return n>=1&&n<=31?n:0};
 const dayIn=v=>v?`value="${v}"`:'';
 function nxt(day){const t=new Date();t.setHours(0,0,0,0);const mk=(y,m)=>new Date(y,m,Math.min(day,new Date(y,m+1,0).getDate()));let d=mk(t.getFullYear(),t.getMonth());if(d<t)d=mk(t.getFullYear(),t.getMonth()+1);return{d,n:Math.round((d-t)/864e5)}}
@@ -187,6 +229,13 @@ function vRes(){
   ${t===0?`<div class="tip">Comece cadastrando suas despesas em <b>Gastos</b> e suas faturas e empréstimos em <b>Dívidas</b>.</div>`:''}
   ${(()=>{const A=agenda();return A.length?`<h2>Próximas datas</h2><div class="c">${A.map(x=>`<div class="row"><div>${x.t}<div class="m">dia ${x.day} · ${x.d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</div></div><b class="${x.ok?'ok':x.w&&x.n<=3?'bad':''}">${inN(x.n)}</b></div>`).join('')}</div>`:''})()}
   <button class="btn" onclick="tab='pla';view()">Ver plano para zerar as dívidas</button>
+  <details class="bk"${Y.tok?' open':''}><summary>Sincronizar aparelhos</summary>
+  <div style="padding-top:14px">${Y.tok?`<div class="m">Conectado. As alterações são enviadas e baixadas automaticamente entre os seus aparelhos.</div>
+  <div class="g2"><button class="btn" onclick="sync()">Sincronizar agora</button><button class="btn" onclick="if(confirm('Desconectar este aparelho? Os dados dele continuam aqui.'))disc()">Desconectar</button></div>`:`<div class="m">Mantém o celular e o tablet iguais, usando um espaço privado na sua conta do GitHub.</div>
+  <div class="m" style="margin-top:10px">1. <a href="https://github.com/settings/tokens/new?scopes=gist&description=Zera%20D%C3%ADvidas" target="_blank" rel="noopener" style="color:var(--ac)">Criar o token</a> (em Expiration escolha "No expiration", role e confirme, copie o token).<br>2. Cole abaixo e toque em Conectar.<br>3. No outro aparelho, use o mesmo token.</div>
+  <label for="syt">Token do GitHub</label><input id="syt" type="password" autocomplete="off" placeholder="ghp_…">
+  <button class="btn" onclick="conn()">Conectar</button>`}
+  <div class="m" id="sym" style="margin-top:12px">${esc(sm)}</div></div></details>
   <details class="bk"><summary>Backup dos dados</summary>
   <div style="padding-top:14px"><div class="m">Seus dados ficam salvos neste aparelho. Copie um backup para não perder se limpar o navegador ou trocar de celular.</div>
   <textarea id="bkt" placeholder="Cole aqui um backup para restaurar"></textarea>
@@ -273,7 +322,7 @@ function vPla(){
   <div class="c"><table><tr><th>Extra</th><th>Prazo</th><th>Juros</th></tr>${ext.map(([e,x])=>`<tr><td>+${R(e)}</td><td>${x.ok?x.months+' meses':'não fecha'}</td><td>${x.ok?R(x.int):'–'}</td></tr>`).join('')}</table></div>
   <p class="m">Estimativa simples: considera mínimo de 15% da fatura nos cartões e as parcelas dos empréstimos. Não substitui orientação financeira.</p>`;
 }
-view();
+view();sync();
 if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 </script>
 </body>
