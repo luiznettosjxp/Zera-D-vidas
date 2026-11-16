@@ -35,7 +35,12 @@ b{font-weight:500}
 .lg b{display:inline-block;width:8px;height:8px;margin-right:6px;border-radius:0}
 label{display:block;font:500 11px/1 "Barlow Condensed",Barlow,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:var(--mute);margin:18px 0 6px}
 input,select{width:100%;font:300 18px Barlow,system-ui,sans-serif;color:var(--ink);background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:8px 0;appearance:none}
-select option{background:#10151B;color:#F2F5F8}
+select option{background:var(--bg);color:var(--ink)}
+input[type=month]{min-height:42px}
+body{transition:background-color .5s,color .5s}
+#th{position:fixed;z-index:6;top:calc(env(safe-area-inset-top,0px) + 12px);right:14px;width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:18px;line-height:1;display:grid;place-items:center;backdrop-filter:blur(8px);transition:transform .5s,border-color .3s}
+#th:hover{border-color:var(--ac)}#th.sp{transform:rotate(360deg)}
+.off{opacity:.45}
 input:focus,select:focus{outline:0;border-bottom-color:var(--ac)}
 button:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 input::placeholder{color:var(--mute);opacity:.6}
@@ -45,7 +50,7 @@ button{font:inherit;cursor:pointer}
 .btn:hover,.btn:active{background:var(--ink);color:var(--bg)}
 .x{background:none;border:0;color:var(--mute);font-size:20px;padding:2px 0 2px 14px;font-weight:200}
 nav{position:fixed;left:0;right:0;bottom:0;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom,0px);z-index:5}
-nav button{flex:1;background:none;border:0;border-top:2px solid transparent;margin-top:-1px;color:var(--mute);padding:17px 2px 15px;font:500 12px/1 "Barlow Condensed",Barlow,sans-serif;letter-spacing:.2em;text-transform:uppercase}
+nav button{flex:1;background:none;border:0;border-top:2px solid transparent;margin-top:-1px;color:var(--mute);padding:17px 0 15px;font:500 12px/1 "Barlow Condensed",Barlow,sans-serif;letter-spacing:.1em;text-transform:uppercase}
 nav button.on{color:var(--ink);border-top-color:var(--ac)}
 .tip{border-left:1px solid var(--ac);padding:4px 0 4px 16px;margin:16px 0;font-size:16px;color:var(--ink)}
 .tip.w{border-color:var(--bad)}
@@ -77,11 +82,12 @@ nav button{transition:color .25s,border-color .25s}
 
 </head>
 <body>
+<button id="th" aria-label="Alternar modo noturno" onclick="togTheme()"></button>
 <main id="app"></main>
 <nav id="nav"></nav>
 <script>
 const K='zera_dividas_v1';
-let S={renda:0,extra:0,desp:[],card:[],loan:[]};
+const DEF=()=>({renda:0,extra:0,theme:'auto',desp:[],card:[],loan:[],ext:[]});let S=DEF();
 try{const x=localStorage.getItem(K);if(x)S=Object.assign(S,JSON.parse(x))}catch(e){}
 const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
 const R=v=>(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
@@ -89,53 +95,61 @@ const N=id=>parseFloat(String(document.getElementById(id).value).replace(',','.'
 const T=id=>document.getElementById(id).value.trim();
 let tab='res',last='';
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
-const tabs=[['res','','Resumo'],['gas','','Gastos'],['div','','Dívidas'],['pla','','Plano']];
+const tabs=[['res','','Resumo'],['gas','','Gastos'],['ext','','Extras'],['div','','Dívidas'],['pla','','Plano']];
 const sum=(a,f)=>a.reduce((s,x)=>s+f(x),0);
-const fixed=()=>sum(S.desp,d=>d.v);
+const ym=o=>{const d=new Date();d.setDate(1);d.setMonth(d.getMonth()+o);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')};
+const fm=s=>{const[y,m]=s.split('-');return new Date(+y,m-1,1).toLocaleDateString('pt-BR',{month:'short',year:'numeric'}).replace('.','')};
+const act=(d,o)=>!d.ate||d.ate>=ym(o);
+const fixed=(o=0)=>sum(S.desp.filter(d=>act(d,o)),d=>d.v);
+const extraIn=(o=0)=>sum(S.ext.filter(e=>e.m===ym(o)),e=>e.v);
+const isDark=()=>!(S.theme==='light'||(S.theme!=='dark'&&matchMedia('(prefers-color-scheme: light)').matches));
+function applyTheme(){const r=document.documentElement;if(S.theme==='light'||S.theme==='dark')r.dataset.theme=S.theme;else delete r.dataset.theme;const d=isDark();r.style.colorScheme=d?'dark':'light';const b=document.getElementById('th');if(b)b.textContent=d?'☀':'☾';const m=document.querySelector('meta[name=theme-color]');if(m)m.content=d?'#06080B':'#F6F7F9'}
+function togTheme(){S.theme=isDark()?'light':'dark';save();applyTheme();const b=document.getElementById('th');b.classList.add('sp');setTimeout(()=>b.classList.remove('sp'),500)}
 const cards=()=>sum(S.card,c=>c.v);
 const parc=()=>sum(S.loan,l=>l.p);
 const total=()=>fixed()+cards()+parc();
 
 function sim(ex){
   const D=[...S.card.map(c=>({n:c.n,b:c.v,r:c.j,card:1})),...S.loan.map(l=>({n:l.n,b:l.s>0?l.s:l.p*l.q,r:l.j,m:l.p}))].filter(d=>d.b>0);
-  const B=S.renda-fixed()+ex;
-  const mins=sum(D,d=>d.card?Math.max(d.b*.15,Math.min(50,d.b)):Math.min(d.b,d.m));
-  let months=0,int=0;
+  let months=0,int=0,def=0,B0=0,m0=0;
   while(D.some(d=>d.b>.01)&&months<360){
-    months++;let left=B;
-    D.forEach(d=>{if(d.b<=.01)return;const i=d.b*d.r/100;d.b+=i;int+=i;
-      const m=d.card?Math.max(d.b*.15,Math.min(50,d.b)):d.m;const p=Math.min(d.b,m);d.b-=p;left-=p;});
+    const o=months;months++;
+    const B=S.renda+extraIn(o)-fixed(o)+ex;let left=B;
+    D.forEach(d=>{if(d.b<=.01)return;const i=d.b*d.r/100;d.b+=i;int+=i;const m=d.card?Math.max(d.b*.15,Math.min(50,d.b)):d.m;const p=Math.min(d.b,m);d.b-=p;left-=p;if(months===1)m0+=p;});
+    if(months===1)B0=B;
+    if(left<-.01&&!def)def=months;
     if(left>0)D.filter(d=>d.b>.01).sort((a,b)=>b.r-a.r).forEach(d=>{const p=Math.min(d.b,left);d.b-=p;left-=p;});
     D.forEach(d=>{if(d.b<=.01&&!d.done)d.done=months});
   }
-  return{months,int,B,mins,deficit:B<mins-.01,ok:months<360&&B>=mins-.01,D,none:D.length===0};
+  return{months,int,B:B0,mins:m0,deficit:def>0,defMonth:def,ok:months<360&&!def,D,none:D.length===0};
 }
 function when(m){const d=new Date();d.setMonth(d.getMonth()+m);return d.toLocaleDateString('pt-BR',{month:'long',year:'numeric'})}
 
 function view(){
-  const a=document.getElementById('app');
+  applyTheme();const a=document.getElementById('app');
   document.getElementById('nav').innerHTML=tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';view();scrollTo(0,0)">${t[2]}</button>`).join('');
-  a.innerHTML=({res:vRes,gas:vGas,div:vDiv,pla:vPla})[tab]();
+  a.innerHTML=({res:vRes,gas:vGas,ext:vExt,div:vDiv,pla:vPla})[tab]();
   const fresh=tab!==last;last=tab;a.classList.toggle('in',fresh);
   if(fresh){[...a.children].forEach((e,i)=>e.style.setProperty('--i',i));count(a)}
 }
 function count(a){a.querySelectorAll('[data-n],[data-t]').forEach(el=>{const m=el.dataset.n!==undefined,v=+(m?el.dataset.n:el.dataset.t);const f=x=>m?R(x):'T−'+Math.round(x);const t0=performance.now();const st=n=>{const k=Math.min(1,(n-t0)/1000),e=1-Math.pow(1-k,3);el.textContent=f(v*e);if(k<1)requestAnimationFrame(st)};requestAnimationFrame(st)})}
 const msg=t=>{const e=document.getElementById('bkm');if(e)e.textContent=t};
 async function bk(){const j=JSON.stringify(S);try{await navigator.clipboard.writeText(j);msg('Backup copiado. Cole em suas notas ou envie para você mesmo.')}catch(e){document.getElementById('bkt').value=j;msg('Copie o texto do campo acima.')}}
-function rs(){try{const o=JSON.parse(T('bkt'));if(!Array.isArray(o.desp))throw 0;S=Object.assign({renda:0,extra:0,desp:[],card:[],loan:[]},o);save();view();}catch(e){msg('Backup inválido. Cole o texto completo.')}}
+function rs(){try{const o=JSON.parse(T('bkt'));if(!Array.isArray(o.desp))throw 0;S=Object.assign(DEF(),o);save();view();}catch(e){msg('Backup inválido. Cole o texto completo.')}}
 
 function vRes(){
-  const t=total(),sob=S.renda-t,f=fixed(),c=cards(),p=parc();
-  const w=v=>t>0?(v/Math.max(t,S.renda)*100).toFixed(1):0;
+  const ex=extraIn(0),t=total(),base=S.renda+ex,sob=base-t,f=fixed(),c=cards(),p=parc();
+  const w=v=>t>0?(v/Math.max(t,base)*100).toFixed(1):0;
   return `<h1>Resumo do mês</h1>
   <div class="c"><div class="m">Gasto previsto até o fim do mês</div><div class="big" data-n="${t}">${R(t)}</div>
   <div class="bar"><i style="width:${w(f)}%;background:var(--ink)"></i><i style="width:${w(c)}%;background:var(--ac)"></i><i style="width:${w(p)}%;background:var(--mute)"></i></div>
   <div class="lg"><span><b style="background:var(--ink)"></b>Despesas ${R(f)}</span><span><b style="background:var(--ac)"></b>Cartões ${R(c)}</span><span><b style="background:var(--mute)"></b>Empréstimos ${R(p)}</span></div></div>
   <div class="c"><label for="renda" style="margin-top:0">Renda mensal líquida (R$)</label>
   <input id="renda" inputmode="decimal" value="${S.renda||''}" placeholder="0,00" onchange="S.renda=N('renda');save();view()">
+  ${ex>0?`<div class="row" style="margin-top:10px"><span>Dinheiro extra neste mês</span><b class="ok">+ ${R(ex)}</b></div>`:''}
   <div class="row" style="margin-top:10px"><span>Sobra (ou falta) no fim do mês</span><b class="${sob>=0?'ok':'bad'}">${R(sob)}</b></div>
-  <div class="row"><span class="m">Comprometimento da renda</span><b>${S.renda>0?Math.round(t/S.renda*100)+'%':'–'}</b></div></div>
-  ${S.renda>0&&sob<0?`<div class="tip w">Você vai fechar o mês com <b>${R(-sob)}</b> a menos do que precisa. Veja o plano para saber o que cortar ou renegociar.</div>`:''}
+  <div class="row"><span class="m">Comprometimento da renda</span><b>${base>0?Math.round(t/base*100)+'%':'–'}</b></div></div>
+  ${base>0&&sob<0?`<div class="tip w">Você vai fechar o mês com <b>${R(-sob)}</b> a menos do que precisa. Veja o plano para saber o que cortar ou renegociar.</div>`:''}
   ${t===0?`<div class="tip">Comece cadastrando suas despesas em <b>Gastos</b> e suas faturas e empréstimos em <b>Dívidas</b>.</div>`:''}
   <button class="btn" onclick="tab='pla';view()">Ver plano para zerar as dívidas</button>
   <h2>Backup dos dados</h2>
@@ -144,17 +158,29 @@ function vRes(){
   <div class="g2"><button class="btn" onclick="bk()">Copiar backup</button><button class="btn" onclick="rs()">Restaurar</button></div>
   <div class="m" id="bkm" style="margin-top:12px"></div></div>`;
 }
-
 function vGas(){
+  const cur=ym(0);
   return `<h1>Despesas do mês</h1>
-  <div class="c">${S.desp.length?S.desp.map((d,i)=>`<div class="row"><div>${d.n}<div class="m">${d.t==='f'?'Fixa':'Variável'}</div></div><div><b>${R(d.v)}</b><button class="x" aria-label="Remover" onclick="S.desp.splice(${i},1);save();view()">×</button></div></div>`).join('')+`<div class="row"><b>Total</b><b>${R(fixed())}</b></div>`:'<div class="m">Nenhuma despesa ainda. Adicione aluguel, mercado, luz, transporte…</div>'}</div>
+  <div class="c">${S.desp.length?S.desp.map((d,i)=>`<div class="row ${act(d,0)?'':'off'}"><div>${d.n}<div class="m">${d.t==='f'?'Fixa':'Variável'} · ${d.ate?(d.ate<cur?'encerrada em '+fm(d.ate):'até '+fm(d.ate)):'sem data final'}</div></div><div><b>${R(d.v)}</b><button class="x" aria-label="Remover" onclick="S.desp.splice(${i},1);save();view()">×</button></div></div>`).join('')+`<div class="row"><b>Total neste mês</b><b>${R(fixed())}</b></div>`:'<div class="m">Nenhuma despesa ainda. Adicione aluguel, mercado, luz, transporte…</div>'}</div>
   <div class="c"><label for="dn" style="margin-top:0">Nome</label><input id="dn" placeholder="Ex.: Aluguel">
   <div class="g2"><div><label for="dv">Valor (R$)</label><input id="dv" inputmode="decimal" placeholder="0,00"></div>
   <div><label for="dt">Tipo</label><select id="dt"><option value="f">Fixa</option><option value="v">Variável</option></select></div></div>
+  <label for="da">Termina em (opcional)</label><input id="da" type="month" min="${cur}">
+  <div class="m" style="margin-top:6px">Deixe em branco se a despesa não tem data para acabar.</div>
   <button class="btn" onclick="addD()">Adicionar despesa</button></div>`;
 }
-function addD(){const n=T('dn'),v=N('dv');if(!n||v<=0)return;S.desp.push({n,v,t:document.getElementById('dt').value});save();view()}
-
+function addD(){const n=T('dn'),v=N('dv'),a=document.getElementById('da').value;if(!n||v<=0)return;S.desp.push({n,v,t:document.getElementById('dt').value,ate:a||''});save();view()}
+function vExt(){
+  const L=S.ext.map((e,i)=>({...e,i})).sort((a,b)=>a.m<b.m?-1:1),cur=ym(0);
+  return `<h1>Dinheiro extra</h1>
+  <div class="c">${L.length?L.map(e=>`<div class="row ${e.m<cur?'off':''}"><div>${e.n}<div class="m">${e.m<cur?'recebido em ':'previsto para '}${fm(e.m)}</div></div><div><b class="ok">+ ${R(e.v)}</b><button class="x" aria-label="Remover" onclick="S.ext.splice(${e.i},1);save();view()">×</button></div></div>`).join('')+`<div class="row"><b>Total a receber</b><b class="ok">${R(sum(L.filter(e=>e.m>=cur),e=>e.v))}</b></div>`:'<div class="m">Nenhum valor extra cadastrado. Inclua 13º, bônus, restituição, venda de algo…</div>'}</div>
+  <div class="c"><label for="en" style="margin-top:0">Origem</label><input id="en" placeholder="Ex.: 13º salário">
+  <div class="g2"><div><label for="ev">Valor (R$)</label><input id="ev" inputmode="decimal" placeholder="0,00"></div>
+  <div><label for="em">Mês que recebe</label><input id="em" type="month" value="${cur}" min="${cur}"></div></div>
+  <button class="btn" onclick="addE()">Adicionar dinheiro extra</button></div>
+  <p class="m">O valor entra na renda do mês escolhido e é usado no plano para quitar a dívida mais cara.</p>`;
+}
+function addE(){const n=T('en'),v=N('ev'),m=document.getElementById('em').value;if(!n||v<=0||!m)return;S.ext.push({n,v,m});save();view()}
 function vDiv(){
   return `<h1>Cartões e empréstimos</h1>
   <h2>Cartões de crédito</h2>
@@ -181,22 +207,26 @@ function vPla(){
   const tips=[];
   const worst=debts[0];
   if(S.renda<=0)tips.push(['w','Informe sua renda no Resumo para o plano calcular com precisão.']);
-  if(r.deficit)tips.push(['w',`Seus pagamentos mínimos (${R(r.mins)}) passam do que sobra após as despesas (${R(r.B)}). Corte gastos variáveis ou renegocie as dívidas antes de qualquer outra coisa.`]);
+  if(r.deficit)tips.push(['w',`Em ${fm(ym(r.defMonth-1))} o que sobra após as despesas não cobre os pagamentos mínimos das dívidas. Corte gastos variáveis ou renegocie as dívidas antes de qualquer outra coisa.`]);
   if(worst)tips.push(['',`Concentre qualquer dinheiro extra em <b>${worst.n}</b> (${worst.r}% ao mês), a dívida mais cara. Pague só o mínimo nas outras. Ao quitar, passe o valor para a próxima.`]);
   if(S.card.some(c=>c.j>=8))tips.push(['w','Nunca deixe fatura no rotativo. Se não conseguir pagar tudo, troque a dívida do cartão por um empréstimo ou parcelamento com juros bem menores.']);
   const varD=S.desp.filter(d=>d.t==='v');const vs=sum(varD,d=>d.v);
   if(vs>0)tips.push(['',`Cortar 20% das despesas variáveis libera <b>${R(vs*.2)}</b> por mês para as dívidas.`]);
   const big=[...S.loan].sort((a,b)=>b.j-a.j)[0];
   if(big&&big.j>=3)tips.push(['',`Peça portabilidade do <b>${big.n}</b> para outro banco com taxa menor e renegocie o saldo. Em feirões de renegociação os descontos podem ser altos.`]);
+  const fe=S.ext.filter(e=>e.m>=ym(0));
+  if(fe.length)tips.push(['',`Seu dinheiro extra (${R(sum(fe,e=>e.v))}) entra no plano no mês em que for recebido e vai direto para a dívida mais cara.`]);
+  const endD=S.desp.filter(d=>d.ate&&d.ate>=ym(0)).sort((a,b)=>a.ate<b.ate?-1:1)[0];
+  if(endD)tips.push(['',`Quando <b>${endD.n}</b> terminar em ${fm(endD.ate)}, ${R(endD.v)} por mês ficam livres. O plano já usa esse valor.`]);
   tips.push(['','Venda itens parados e use renda extra pontual para amortizar o saldo. Antecipar parcelas reduz os juros futuros.']);
   tips.push(['','Evite novas compras no cartão até zerar. Pague a fatura inteira todo mês.']);
   const ext=[0,100,300,500].map(e=>[e,sim(e)]);
   return `<h1>Plano para zerar</h1>
   <div class="c"><div class="m">${r.ok?'Contagem regressiva':'Com a sua renda atual'}</div>
-  ${r.ok?`<div class="big ok" data-t="${r.months}">T−${r.months}</div><div class="m" style="margin-top:6px">${r.months===1?'mês':'meses'} para dívida zero</div><div class="m">${when(r.months)} · juros totais estimados ${R(r.int)}</div>`:`<div class="big bad">Não fecha</div><div class="m">${r.deficit?'O orçamento não cobre os pagamentos mínimos.':'Mais de 30 anos para quitar nesse ritmo.'}</div>`}
+  ${r.ok?`<div class="big ok" data-t="${r.months}">T−${r.months}</div><div class="m" style="margin-top:6px">${r.months===1?'mês':'meses'} para dívida zero</div><div class="m">${when(r.months-1)} · juros totais estimados ${R(r.int)}</div>`:`<div class="big bad">Não fecha</div><div class="m">${r.deficit?'O orçamento não cobre os pagamentos mínimos.':'Mais de 30 anos para quitar nesse ritmo.'}</div>`}
   <label for="ex">Valor extra por mês para as dívidas (R$)</label>
   <input id="ex" inputmode="decimal" value="${ex||''}" placeholder="0,00" onchange="S.extra=N('ex');save();view()">
-  <div class="row" style="margin-top:10px"><span class="m">Disponível por mês para dívidas</span><b>${R(r.B)}</b></div></div>
+  <div class="row" style="margin-top:10px"><span class="m">Disponível este mês para dívidas</span><b>${R(r.B)}</b></div></div>
   <h2>Ordem de pagamento</h2>
   <div class="c">${debts.map((d,i)=>`<div class="row"><div>${i+1}. ${d.n}<div class="m">juros ${d.r}% ao mês</div></div><b>${d.done?'quita em '+d.done+(d.done===1?' mês':' meses'):'não quita'}</b></div>`).join('')}</div>
   <h2>O que fazer</h2>
