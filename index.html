@@ -59,7 +59,14 @@ nav{position:fixed;left:0;right:0;bottom:0;background:color-mix(in srgb,var(--bg
 nav button{flex:1;background:none;border:0;border-top:2px solid transparent;margin-top:-1px;color:var(--mute);padding:17px 0 15px;font:500 12px/1 "Barlow Condensed",Barlow,sans-serif;letter-spacing:.1em;text-transform:uppercase}
 nav button.on{color:var(--ink);border-top-color:var(--ac)}
 .tip{border-left:1px solid var(--ac);padding:4px 0 4px 16px;margin:16px 0;font-size:16px;color:var(--ink)}
-.tip.w{border-color:var(--bad)}.tip.wn{border-color:var(--wine)}.wine{color:var(--wine)}
+.tip.w{border-color:var(--bad)}
+.ckw{background:none;border:0;padding:12px 14px 12px 0;margin:-12px 0;display:grid;place-items:center}
+.ck{display:block;width:18px;height:18px;border:1px solid var(--mute);border-radius:2px;position:relative;transition:border-color .2s,background .2s}
+.ckw:hover .ck{border-color:var(--ac)}
+.ckw[aria-checked=true] .ck{border-color:var(--ac);background:var(--acs)}
+.ckw[aria-checked=true] .ck::after{content:"";position:absolute;left:5px;top:1px;width:5px;height:10px;border:solid var(--ac);border-width:0 1px 1px 0;transform:rotate(45deg)}
+.rl{display:flex;align-items:center}
+.pd b,.pd .nm{opacity:.5}.pd .nm{text-decoration:line-through;text-decoration-thickness:1px}.tip.wn{border-color:var(--wine)}.wine{color:var(--wine)}
 table{width:100%;border-collapse:collapse;font-size:15px}
 td,th{padding:11px 0;border-top:1px solid var(--line);text-align:right}
 th{font:500 11px/1 "Barlow Condensed",Barlow,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:var(--mute);border-top:0}
@@ -93,14 +100,15 @@ nav button{transition:color .25s,border-color .25s}
 <nav id="nav"></nav>
 <script>
 const K='zera_dividas_v1';
-const DEF=()=>({renda:0,diaRec:0,extra:0,theme:'auto',desp:[],card:[],loan:[],ext:[],par:[]});let S=DEF();
+const DEF=()=>({renda:0,diaRec:0,extra:0,theme:'auto',pg:{},desp:[],card:[],loan:[],ext:[],par:[]});let S=DEF();
 try{const x=localStorage.getItem(K);if(x)S=Object.assign(S,JSON.parse(x))}catch(e){}
-function fixIds(){S.card.forEach((c,i)=>{if(!c.id)c.id='c'+i});if(!Array.isArray(S.par))S.par=[];
+function fixIds(){S.card.forEach((c,i)=>{if(!c.id)c.id='c'+i});S.desp.forEach((d,i)=>{if(!d.id)d.id='d'+i});S.loan.forEach((l,i)=>{if(!l.id)l.id='l'+i});if(!S.pg||typeof S.pg!=='object')S.pg={};if(!Array.isArray(S.par))S.par=[];
   const old=S.par.filter(x=>!x.m&&x.p&&x.q);if(old.length){S.par=S.par.filter(x=>x.m);
    old.forEach(x=>{for(let o=1;o<=x.q;o++){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()+o);S.par.push({k:x.k,m:d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'),v:x.p})}})}}
 fixIds();
 const saveQ=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
 const save=()=>{S.upd=Math.max(Date.now(),(S.upd||0)+1);saveQ();qs()};
+saveQ();
 /* ---- Sincronização entre aparelhos (gist privado do GitHub) ---- */
 const SK='zera_sync',FN='zera_dividas.json';
 let Y={tok:'',gid:'',at:0};try{Object.assign(Y,JSON.parse(localStorage.getItem(SK)||'{}'))}catch(e){}
@@ -223,6 +231,28 @@ const msg=t=>{const e=document.getElementById('bkm');if(e)e.textContent=t};
 async function bk(){const j=JSON.stringify(S);try{await navigator.clipboard.writeText(j);msg('Backup copiado. Cole em suas notas ou envie para você mesmo.')}catch(e){document.getElementById('bkt').value=j;document.getElementById('bkt').closest('details').open=true;msg('Copie o texto do campo acima.')}}
 function rs(){try{const o=JSON.parse(T('bkt'));if(!Array.isArray(o.desp))throw 0;S=Object.assign(DEF(),o);fixIds();save();view();}catch(e){msg('Backup inválido. Cole o texto completo.')}}
 
+const outs=()=>[...S.desp.filter(d=>act(d,0)).map(d=>({k:d.id,n:d.n,v:d.v,t:d.t==='f'?'Despesa fixa':'Despesa variável'})),...S.card.map(c=>({k:c.id,n:c.n,v:Math.max(c.v*.15,Math.min(50,c.v)),t:'Fatura do cartão (mín.)'})),...S.loan.map(l=>({k:l.id,n:l.n,v:l.p,t:'Parcela do empréstimo'}))];
+function tg(k){const m=ym(0);if(!S.pg)S.pg={};const o=S.pg[m]=S.pg[m]||{};if(o[k])delete o[k];else o[k]=1;Object.keys(S.pg).filter(x=>x<ym(-2)).forEach(x=>delete S.pg[x]);save();view()}
+function vReal(){
+  const f=fixed(),c=cards(),p=parc(),T=f+c+p,ent=S.renda+extraIn(0),d=ent-T;
+  if(T<=0&&ent<=0)return '';
+  return `<h2>Saída real do mês</h2><div class="c"><div class="m">Pagando as faturas por inteiro</div>
+  <div class="row"><span>Despesas</span><b>${R(f)}</b></div>
+  <div class="row"><span>Cartões (fatura inteira)</span><b>${R(c)}</b></div>
+  <div class="row"><span>Empréstimos (parcelas)</span><b>${R(p)}</b></div>
+  <div class="row"><b>Saída real</b><b>${R(T)}</b></div>
+  <div class="row"><span>O que entra${extraIn(0)>0?' (renda + extra)':''}</span><b class="ok">${R(ent)}</b></div>
+  <div class="row"><span>Diferença</span><b class="${d<-.005?'wine':'ok'}">${R(d)}</b></div></div>`;
+}
+function vOut(){
+  const L=outs();if(!L.length)return '';
+  const pg=(S.pg||{})[ym(0)]||{},T=sum(L,x=>x.v),P=sum(L.filter(x=>pg[x.k]),x=>x.v),F=T-P,w=T>0?(P/T*100).toFixed(1):0;
+  return `<h2>Saídas do mês</h2><div class="c"><div class="m">Pago e a pagar</div>
+  <div class="row"><span>Já paguei</span><b class="ok">${R(P)}</b></div>
+  <div class="row"><span>Falta pagar</span><b>${R(F)}</b></div>
+  <div class="bar"><i style="width:${w}%;background:var(--ac)"></i></div>
+  ${L.map(x=>`<div class="row ${pg[x.k]?'pd':''}"><div class="rl"><button class="ckw" role="checkbox" aria-checked="${!!pg[x.k]}" aria-label="Marcar ${esc(x.n)} como pago" onclick="tg('${x.k}')"><i class="ck"></i></button><div><span class="nm">${esc(x.n)}</span><div class="m">${x.t}</div></div></div><b>${R(x.v)}</b></div>`).join('')}</div>`;
+}
 function vRes(){
   const ex=extraIn(0),t=total(),base=S.renda+ex,sob=base-t,f=fixed(),c=cardPay(),p=parc();
   const w=v=>t>0?(v/Math.max(t,base)*100).toFixed(1):0;
@@ -240,6 +270,8 @@ function vRes(){
   <div class="row"><span class="m">Comprometimento da renda</span><b>${base>0?Math.round(t/base*100)+'%':'–'}</b></div></div>
   ${base>0&&sob<-.005?`<div class="tip wn">Você vai fechar o mês com <b>${R(-sob)}</b> a menos do que precisa. Veja o plano para saber o que cortar ou renegociar.</div>`:''}
   ${t===0?`<div class="tip">Comece cadastrando suas despesas em <b>Gastos</b> e suas faturas e empréstimos em <b>Dívidas</b>.</div>`:''}
+  ${vReal()}
+  ${vOut()}
   ${(()=>{const A=agenda();return A.length?`<h2>Próximas datas</h2><div class="c">${A.map(x=>`<div class="row"><div>${x.t}<div class="m">dia ${x.day} · ${x.d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</div></div><b class="${x.ok?'ok':x.w&&x.n<=3?'bad':''}">${inN(x.n)}</b></div>`).join('')}</div>`:''})()}
   <button class="btn" onclick="tab='pla';view()">Ver plano para zerar as dívidas</button>
   <details class="bk"${Y.tok?' open':''}><summary>Sincronizar aparelhos</summary>
@@ -266,7 +298,7 @@ function vGas(){
   <div class="m" style="margin-top:8px">Deixe "—" se a despesa não tem data para acabar.</div>
   ${btns('desp','Adicionar despesa')}</div>`;
 }
-function addD(){const n=T('dn'),v=NM('dv');if(!n||v<=0)return;put('desp',{n,v,t:document.getElementById('dt').value,ate:gp('da')})}
+function addD(){const n=T('dn'),v=NM('dv');if(!n||v<=0)return;const o=ed('desp');put('desp',{n,v,t:document.getElementById('dt').value,ate:gp('da'),id:(o&&o.id)||'d'+Date.now().toString(36)})}
 function vExt(){
   const L=S.ext.map((x,i)=>({...x,i})).sort((a,b)=>a.m<b.m?-1:1),cur=ym(0),e=ed('ext')||{};
   return `<h1>Dinheiro extra</h1>
@@ -319,7 +351,7 @@ function vPar(){
   <div class="m" style="margin-top:8px">Some o que já está comprometido naquele mês neste cartão. Se lançar o mesmo cartão e mês de novo, o valor é substituído.</div>
   ${btns('par','Adicionar mês')}</div>`:'<div class="m">Cadastre um cartão acima para lançar parcelas futuras.</div>'}`;
 }
-function addL(){const n=T('ln'),p=NM('lp'),q=Math.round(N('lq')),j=N('lj'),s=NM('ls');if(!n||p<=0||q<=0)return;put('loan',{n,p,q,j,s,d:DD('ld')})}
+function addL(){const n=T('ln'),p=NM('lp'),q=Math.round(N('lq')),j=N('lj'),s=NM('ls');if(!n||p<=0||q<=0)return;const o=ed('loan');put('loan',{n,p,q,j,s,d:DD('ld'),id:(o&&o.id)||'l'+Date.now().toString(36)})}
 function vPla(){
   if(!S.card.length&&!S.loan.length)return `<h1>Plano para zerar</h1><div class="tip">Cadastre ao menos um cartão ou empréstimo em <b>Dívidas</b> para ver o plano.</div>`;
   const ex=S.extra||0,r=sim(ex),debts=[...r.D].sort((a,b)=>b.r-a.r);
