@@ -355,6 +355,38 @@ function vPar(){
   ${btns('par','Adicionar mês')}</div>`:'<div class="m">Cadastre um cartão acima para lançar parcelas futuras.</div>'}`;
 }
 function addL(){const n=T('ln'),p=NM('lp'),q=Math.round(N('lq')),j=N('lj'),s=NM('ls');if(!n||p<=0||q<=0)return;const o=ed('loan');put('loan',{n,p,q,j,s,d:DD('ld'),id:(o&&o.id)||'l'+Date.now().toString(36)})}
+function iaTxt(){
+  const L=[],pg=(S.pg||{})[ym(0)]||{},f=fixed(),c=cards(),p=parc(),ent=S.renda+extraIn(0);
+  L.push('Uso o app Zera Dívidas para sair das dívidas. Abaixo estão meus dados de '+fm(ym(0))+'. Analise com cuidado, aponte erros ou premissas irreais e me ajude a montar um plano realista.','');
+  L.push('RENDA','- Renda mensal líquida: '+R(S.renda)+(S.diaRec?' (recebo dia '+S.diaRec+')':''));
+  if(S.extra)L.push('- Valor extra por mês que pretendo usar nas dívidas: '+R(S.extra));
+  S.ext.filter(e=>e.m>=ym(0)).forEach(e=>L.push('- Dinheiro extra: '+e.n+', '+R(e.v)+' em '+fm(e.m)));
+  L.push('','DESPESAS DO MÊS');
+  const dd=S.desp.filter(d=>act(d,0));
+  dd.length?dd.forEach(d=>L.push('- '+d.n+': '+R(d.v)+' ('+(d.t==='f'?'fixa':'variável')+(d.ate?', até '+fm(d.ate):'')+')')):L.push('- nenhuma cadastrada');
+  L.push('','CARTÕES DE CRÉDITO');
+  S.card.length?S.card.forEach(x=>{L.push('- '+x.n+': fatura '+R(x.v)+', juros do rotativo '+x.j+'% ao mês'+(x.f?', fecha dia '+x.f:'')+(x.d?', vence dia '+x.d:''));S.par.filter(y=>y.k===x.id&&y.m>=ym(1)).sort((a,b)=>a.m<b.m?-1:1).forEach(y=>L.push('    parcelas futuras em '+fm(y.m)+': '+R(y.v)))}):L.push('- nenhum');
+  L.push('','EMPRÉSTIMOS E FINANCIAMENTOS');
+  S.loan.length?S.loan.forEach(x=>L.push('- '+x.n+': parcela '+R(x.p)+', '+x.q+' parcelas restantes, juros '+x.j+'% ao mês'+(x.s>0?', saldo devedor '+R(x.s):'')+(x.d?', vence dia '+x.d:''))):L.push('- nenhum');
+  L.push('','SAÍDA REAL DO MÊS (faturas pagas por inteiro)','- Despesas '+R(f)+' + cartões '+R(c)+' + empréstimos '+R(p)+' = '+R(f+c+p),'- Entra: '+R(ent)+' | Diferença: '+R(ent-(f+c+p)));
+  const O=outs(),P=sum(O.filter(x=>pg[x.k]),x=>x.v);
+  L.push('- Já marquei como pago: '+R(P)+' | Falta pagar (cartão no mínimo): '+R(sum(O,x=>x.v)-P));
+  if(S.card.length||S.loan.length){const r=sim(S.extra||0);
+    L.push('','PLANO DO APP');
+    L.push(r.ok?'- Dívida zero em '+r.months+' meses ('+when(r.months-1)+'), juros estimados '+R(r.int):'- O plano não fecha com a renda atual');
+    L.push('- Adiantar parcelas de empréstimo: '+(S.adiant?'sim':'não, seguindo o prazo do contrato'));
+    if(r.deficit)L.push('- Há meses em que a renda não cobre os pagamentos mínimos');
+    if(r.ok&&r.rows.length)L.push('- Resta por mês: '+r.rows.slice(0,12).map(x=>R(x.rest)).join(' → '))}
+  L.push('','PREMISSAS DO APP (podem estar erradas)','- Toda a renda que sobra depois das despesas cadastradas é usada nas dívidas; gastos não cadastrados não entram.','- Cartão paga no mínimo de 15% da fatura (mín. R$ 50) e o excedente vai para a dívida de maior juro.','','PERGUNTAS','1. Esse plano é realista? O que está faltando ou errado?','2. Qual dívida priorizar e por quê?','3. Vale renegociar ou trocar alguma dívida? Como fazer?','4. Que gastos eu poderia cortar para zerar mais rápido?');
+  return L.join('\n');
+}
+const setIA=t=>{const e=document.getElementById('iam');if(e)e.textContent=t};
+async function shIA(copy){
+  const t=iaTxt();
+  if(!copy&&navigator.share){try{await navigator.share({title:'Zera Dívidas',text:t});return}catch(e){if(e&&e.name==='AbortError')return}}
+  try{await navigator.clipboard.writeText(t);setIA('Texto copiado. Cole na conversa com a IA.')}
+  catch(e){const a=document.getElementById('iat');a.style.display='block';a.value=t;a.select();setIA('Copie o texto do campo acima.')}
+}
 function vPla(){
   if(!S.card.length&&!S.loan.length)return `<h1>Plano para zerar</h1><div class="tip">Cadastre ao menos um cartão ou empréstimo em <b>Dívidas</b> para ver o plano.</div>`;
   const ex=S.extra||0,r=sim(ex),debts=[...r.D].sort((a,b)=>b.r-a.r);
@@ -393,6 +425,12 @@ function vPla(){
   ${tips.map(t=>`<div class="tip ${t[0]}">${t[1]}</div>`).join('')}
   <h2>E se eu pagar mais por mês?</h2>
   <div class="c"><table><tr><th>Extra</th><th>Prazo</th><th>Juros</th></tr>${ext.map(([e,x])=>`<tr><td>+${R(e)}</td><td>${x.ok?x.months+' meses':'não fecha'}</td><td>${x.ok?R(x.int):'–'}</td></tr>`).join('')}</table></div>
+  <h2>Ajuda de uma IA</h2>
+  <div class="c"><div class="m">Resumo dos seus dados</div>
+  <div class="m">Gera um texto com renda, despesas, dívidas e o resultado deste plano, pronto para enviar a uma IA. O token do GitHub não vai junto. Confira o conteúdo antes de enviar.</div>
+  <textarea id="iat" style="display:none" aria-label="Texto para copiar"></textarea>
+  <div class="g2"><button class="btn" onclick="shIA()">Compartilhar</button><button class="btn" onclick="shIA(1)">Copiar</button></div>
+  <div class="m" id="iam" style="margin-top:12px"></div></div>
   <p class="m">Estimativa simples: considera mínimo de 15% da fatura nos cartões e as parcelas dos empréstimos. As parcelas futuras dos cartões são descontadas do orçamento mês a mês. Não substitui orientação financeira.</p>`;
 }
 view();sync();
