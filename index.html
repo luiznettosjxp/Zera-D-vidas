@@ -100,7 +100,7 @@ nav button{transition:color .25s,border-color .25s}
 <nav id="nav"></nav>
 <script>
 const K='zera_dividas_v1';
-const DEF=()=>({renda:0,diaRec:0,extra:0,theme:'auto',pg:{},desp:[],card:[],loan:[],ext:[],par:[]});let S=DEF();
+const DEF=()=>({renda:0,diaRec:0,extra:0,theme:'auto',adiant:false,pg:{},desp:[],card:[],loan:[],ext:[],par:[]});let S=DEF();
 try{const x=localStorage.getItem(K);if(x)S=Object.assign(S,JSON.parse(x))}catch(e){}
 function fixIds(){S.card.forEach((c,i)=>{if(!c.id)c.id='c'+i});S.desp.forEach((d,i)=>{if(!d.id)d.id='d'+i});S.loan.forEach((l,i)=>{if(!l.id)l.id='l'+i});if(!S.pg||typeof S.pg!=='object')S.pg={};if(!Array.isArray(S.par))S.par=[];
   const old=S.par.filter(x=>!x.m&&x.p&&x.q);if(old.length){S.par=S.par.filter(x=>x.m);
@@ -195,6 +195,7 @@ const inN=n=>n===0?'hoje':n===1?'amanhã':'em '+n+' dias';
 const cards=()=>sum(S.card,c=>c.v);
 const parc=()=>sum(S.loan,l=>l.p);
 const parM=o=>o>=1?sum(S.par.filter(x=>x.m===ym(o)),x=>x.v):0;
+const parEnd=()=>{let L=0;const n=new Date();S.par.forEach(x=>{if(x.m>=ym(1)){const[y,m]=x.m.split('-');L=Math.max(L,(+y-n.getFullYear())*12+(+m-1-n.getMonth()))}});return L};
 const parTot=()=>sum(S.par.filter(x=>x.m>=ym(1)),x=>x.v);
 const cpx=c=>{const L=S.par.filter(x=>x.k===c.id&&x.m>=ym(1));return L.length?`<div class="m">+ ${R(sum(L,x=>x.v))} em parcelas futuras (${L.length} ${L.length===1?'mês':'meses'})</div>`:''};
 const cardPay=()=>sum(S.card,c=>Math.max(c.v*.15,Math.min(50,c.v)));
@@ -203,7 +204,8 @@ const total=()=>fixed()+cardPay()+parc();
 function sim(ex){
   const D=[...S.card.map(c=>({n:c.n,b:c.v,r:c.j,card:1})),...S.loan.map(l=>({n:l.n,b:l.s>0?l.s:(l.j>0?l.p*(1-Math.pow(1+l.j/100,-l.q))/(l.j/100):l.p*l.q),r:l.j,m:l.p,q:l.q}))].filter(d=>d.b>0).sort((a,b)=>b.r-a.r);
   let months=0,int=0,def=0,B0=0,m0=0;const rows=[];
-  while(D.some(d=>d.b>.01)&&months<360){
+  const LP=parEnd();
+  while((D.some(d=>d.b>.01)||(LP>0&&months<=LP))&&months<360){
     const o=months;months++;
     const B=S.renda+extraIn(o)-fixed(o)-parM(o)+ex;let left=B,need=0,paid=0;
     D.forEach(d=>{if(d.b<=.01)return;
@@ -212,7 +214,7 @@ function sim(ex){
       const p=Math.min(mm,Math.max(left,0));d.b-=p;left-=p;paid+=p;if(!d.card&&d.q>0&&p>=mm-.01)d.q--;if(months===1)m0+=p;});
     if(months===1)B0=B;
     if(need>B+.01&&!def)def=months;
-    if(left>0)D.filter(d=>d.b>.01).sort((a,b)=>b.r-a.r).forEach(d=>{const p=Math.min(d.b,left);d.b-=p;left-=p;paid+=p;});
+    if(left>0)D.filter(d=>d.b>.01&&(d.card||S.adiant||!(d.q>0))).sort((a,b)=>b.r-a.r).forEach(d=>{const p=Math.min(d.b,left);d.b-=p;left-=p;paid+=p;});
     D.forEach(d=>{if(d.card&&d.b>.01){const i=d.b*d.r/100;d.b+=i;int+=i}if(d.b<=.01&&!d.done)d.done=months});
     rows.push({o,B,paid,rest:sum(D,d=>Math.max(d.b,0))});
   }
@@ -379,9 +381,11 @@ function vPla(){
   ${r.ok?`<div class="big ok" data-t="${r.months}">T−${r.months}</div><div class="m" style="margin-top:6px">${r.months===1?'mês':'meses'} para dívida zero</div><div class="m">${when(r.months-1)} · juros totais estimados ${R(r.int)}</div>`:`<div class="big bad">Não fecha</div><div class="m">${r.deficit?'O orçamento não cobre os pagamentos mínimos.':'Mais de 30 anos para quitar nesse ritmo.'}</div>`}
   <label for="ex">Valor extra por mês para as dívidas (R$)</label>
   <input id="ex" class="money" inputmode="numeric" value="${ex?fm2(ex):''}" placeholder="0,00" onchange="S.extra=NM('ex');save();view()">
+  <label for="ad">Adiantar parcelas dos empréstimos?</label>
+  <select id="ad" onchange="S.adiant=this.value==='1';save();view()"><option value="0" ${S.adiant?'':'selected'}>Não, seguir o prazo do contrato</option><option value="1" ${S.adiant?'selected':''}>Sim, usar a sobra para quitar antes</option></select>
   <div class="row" style="margin-top:10px"><span class="m">Disponível este mês para dívidas</span><b class="${r.B<-.005?'wine':''}">${R(r.B)}</b></div></div>
   <h2>Ordem de pagamento</h2>
-  <div class="c">${debts.map((d,i)=>`<div class="row"><div>${i+1}. ${d.n}<div class="m">juros ${d.r}% ao mês</div></div><b>${d.done?'quita em '+d.done+(d.done===1?' mês':' meses'):'não quita'}</b></div>`).join('')}</div>
+  <div class="c">${debts.map((d,i)=>`<div class="row"><div>${i+1}. ${d.n}<div class="m">juros ${d.r}% ao mês</div></div><b>${d.done?'quita em '+d.done+(d.done===1?' mês':' meses'):'não quita'}</b></div>`).join('')}${parEnd()>0?`<div class="row"><div>Parcelas futuras nos cartões<div class="m">${R(parTot())} já comprometidos</div></div><b>até ${fm(ym(parEnd()))}</b></div>`:''}</div>
   <h2>Mês a mês</h2>
   <div class="c"><table><tr><th>Mês</th><th>Livre</th><th>Pago</th><th>Resta</th></tr>${r.rows.slice(0,12).map(x=>`<tr><td>${fm(ym(x.o))}</td><td class="${x.B<-.005?'wine':''}">${R(x.B)}</td><td>${R(x.paid)}</td><td>${R(x.rest)}</td></tr>`).join('')}</table>
   <div class="m" style="margin-top:12px">Livre = renda + extras − despesas − parcelas de cartão do mês. O plano usa todo esse valor nas dívidas, inclusive para adiantar parcelas de empréstimo.</div></div>
