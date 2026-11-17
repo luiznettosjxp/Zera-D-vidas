@@ -10,10 +10,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@200;300;400;500;600&family=Barlow+Condensed:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#06080B;--card:rgba(255,255,255,.035);--ink:#F2F5F8;--mute:#8793A0;--line:rgba(255,255,255,.14);--ac:#6CC4FF;--acs:rgba(108,196,255,.08);--bad:#FF6B63;--bads:rgba(255,107,99,.08);--warn:#E8B04A;
+:root{--bg:#06080B;--card:rgba(255,255,255,.035);--ink:#F2F5F8;--mute:#8793A0;--line:rgba(255,255,255,.14);--ac:#6CC4FF;--acs:rgba(108,196,255,.08);--bad:#FF6B63;--bads:rgba(255,107,99,.08);--warn:#E8B04A;--wine:#CC4065;
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-@media(prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#F6F7F9;--card:#fff;--ink:#0B0E12;--mute:#667381;--line:rgba(10,14,18,.14);--ac:#0B6FC2;--acs:rgba(11,111,194,.06);--bad:#C42E27;--bads:rgba(196,46,39,.06)}}
-:root[data-theme="light"]{--bg:#F6F7F9;--card:#fff;--ink:#0B0E12;--mute:#667381;--line:rgba(10,14,18,.14);--ac:#0B6FC2;--acs:rgba(11,111,194,.06);--bad:#C42E27;--bads:rgba(196,46,39,.06)}
+@media(prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#F6F7F9;--card:#fff;--ink:#0B0E12;--mute:#667381;--line:rgba(10,14,18,.14);--ac:#0B6FC2;--acs:rgba(11,111,194,.06);--bad:#C42E27;--bads:rgba(196,46,39,.06);--wine:#7A1631}}
+:root[data-theme="light"]{--bg:#F6F7F9;--card:#fff;--ink:#0B0E12;--mute:#667381;--line:rgba(10,14,18,.14);--ac:#0B6FC2;--acs:rgba(11,111,194,.06);--bad:#C42E27;--bads:rgba(196,46,39,.06);--wine:#7A1631}
 *{box-sizing:border-box}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;background:var(--bg);color:var(--ink);font:300 16px/1.5 Barlow,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums;padding-bottom:88px;
@@ -59,7 +59,7 @@ nav{position:fixed;left:0;right:0;bottom:0;background:color-mix(in srgb,var(--bg
 nav button{flex:1;background:none;border:0;border-top:2px solid transparent;margin-top:-1px;color:var(--mute);padding:17px 0 15px;font:500 12px/1 "Barlow Condensed",Barlow,sans-serif;letter-spacing:.1em;text-transform:uppercase}
 nav button.on{color:var(--ink);border-top-color:var(--ac)}
 .tip{border-left:1px solid var(--ac);padding:4px 0 4px 16px;margin:16px 0;font-size:16px;color:var(--ink)}
-.tip.w{border-color:var(--bad)}
+.tip.w{border-color:var(--bad)}.tip.wn{border-color:var(--wine)}.wine{color:var(--wine)}
 table{width:100%;border-collapse:collapse;font-size:15px}
 td,th{padding:11px 0;border-top:1px solid var(--line);text-align:right}
 th{font:500 11px/1 "Barlow Condensed",Barlow,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:var(--mute);border-top:0}
@@ -198,11 +198,14 @@ function sim(ex){
   while(D.some(d=>d.b>.01)&&months<360){
     const o=months;months++;
     const B=S.renda+extraIn(o)-fixed(o)-parM(o)+ex;let left=B,need=0;
-    D.forEach(d=>{if(d.b<=.01)return;const i=d.b*d.r/100;d.b+=i;int+=i;const m=(d.card||!(d.q>0))?Math.max(d.b*.15,Math.min(50,d.b)):d.m;const mm=Math.min(d.b,m);need+=mm;const p=Math.min(mm,Math.max(left,0));d.b-=p;left-=p;if(!d.card&&d.q>0&&p>=mm-.01)d.q--;if(months===1)m0+=p;});
+    D.forEach(d=>{if(d.b<=.01)return;
+      if(!d.card){const i=d.b*d.r/100;d.b+=i;int+=i}
+      const m=(d.card||!(d.q>0))?Math.max(d.b*.15,Math.min(50,d.b)):d.m;const mm=Math.min(d.b,m);need+=mm;
+      const p=Math.min(mm,Math.max(left,0));d.b-=p;left-=p;if(!d.card&&d.q>0&&p>=mm-.01)d.q--;if(months===1)m0+=p;});
     if(months===1)B0=B;
     if(need>B+.01&&!def)def=months;
     if(left>0)D.filter(d=>d.b>.01).sort((a,b)=>b.r-a.r).forEach(d=>{const p=Math.min(d.b,left);d.b-=p;left-=p;});
-    D.forEach(d=>{if(d.b<=.01&&!d.done)d.done=months});
+    D.forEach(d=>{if(d.card&&d.b>.01){const i=d.b*d.r/100;d.b+=i;int+=i}if(d.b<=.01&&!d.done)d.done=months});
   }
   return{months,int,B:B0,mins:m0,deficit:def>0,defMonth:def,ok:months<360,D,none:D.length===0};
 }
@@ -232,10 +235,10 @@ function vRes(){
   <label for="drec">Dia do mês que eu recebo</label>
   <input id="drec" inputmode="numeric" maxlength="2" placeholder="Ex.: 5" ${dayIn(S.diaRec)} onchange="S.diaRec=DD('drec');save();view()">
   ${ex>0?`<div class="row" style="margin-top:10px"><span>Dinheiro extra neste mês</span><b class="ok">+ ${R(ex)}</b></div>`:''}
-  <div class="row" style="margin-top:10px"><span>Sobra (ou falta) no fim do mês</span><b class="${sob>=0?'ok':'bad'}">${R(sob)}</b></div>
+  <div class="row" style="margin-top:10px"><span>Sobra (ou falta) no fim do mês</span><b class="${sob<-.005?'wine':'ok'}">${R(sob)}</b></div>
   ${S.par.length?`<div class="row"><span class="m">Parcelas futuras nos cartões</span><b>${R(parTot())}</b></div>`:''}
   <div class="row"><span class="m">Comprometimento da renda</span><b>${base>0?Math.round(t/base*100)+'%':'–'}</b></div></div>
-  ${base>0&&sob<0?`<div class="tip w">Você vai fechar o mês com <b>${R(-sob)}</b> a menos do que precisa. Veja o plano para saber o que cortar ou renegociar.</div>`:''}
+  ${base>0&&sob<-.005?`<div class="tip wn">Você vai fechar o mês com <b>${R(-sob)}</b> a menos do que precisa. Veja o plano para saber o que cortar ou renegociar.</div>`:''}
   ${t===0?`<div class="tip">Comece cadastrando suas despesas em <b>Gastos</b> e suas faturas e empréstimos em <b>Dívidas</b>.</div>`:''}
   ${(()=>{const A=agenda();return A.length?`<h2>Próximas datas</h2><div class="c">${A.map(x=>`<div class="row"><div>${x.t}<div class="m">dia ${x.day} · ${x.d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</div></div><b class="${x.ok?'ok':x.w&&x.n<=3?'bad':''}">${inN(x.n)}</b></div>`).join('')}</div>`:''})()}
   <button class="btn" onclick="tab='pla';view()">Ver plano para zerar as dívidas</button>
@@ -343,7 +346,7 @@ function vPla(){
   ${r.ok?`<div class="big ok" data-t="${r.months}">T−${r.months}</div><div class="m" style="margin-top:6px">${r.months===1?'mês':'meses'} para dívida zero</div><div class="m">${when(r.months-1)} · juros totais estimados ${R(r.int)}</div>`:`<div class="big bad">Não fecha</div><div class="m">${r.deficit?'O orçamento não cobre os pagamentos mínimos.':'Mais de 30 anos para quitar nesse ritmo.'}</div>`}
   <label for="ex">Valor extra por mês para as dívidas (R$)</label>
   <input id="ex" class="money" inputmode="numeric" value="${ex?fm2(ex):''}" placeholder="0,00" onchange="S.extra=NM('ex');save();view()">
-  <div class="row" style="margin-top:10px"><span class="m">Disponível este mês para dívidas</span><b>${R(r.B)}</b></div></div>
+  <div class="row" style="margin-top:10px"><span class="m">Disponível este mês para dívidas</span><b class="${r.B<-.005?'wine':''}">${R(r.B)}</b></div></div>
   <h2>Ordem de pagamento</h2>
   <div class="c">${debts.map((d,i)=>`<div class="row"><div>${i+1}. ${d.n}<div class="m">juros ${d.r}% ao mês</div></div><b>${d.done?'quita em '+d.done+(d.done===1?' mês':' meses'):'não quita'}</b></div>`).join('')}</div>
   <h2>O que fazer</h2>
