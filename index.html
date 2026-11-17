@@ -202,20 +202,21 @@ const total=()=>fixed()+cardPay()+parc();
 
 function sim(ex){
   const D=[...S.card.map(c=>({n:c.n,b:c.v,r:c.j,card:1})),...S.loan.map(l=>({n:l.n,b:l.s>0?l.s:(l.j>0?l.p*(1-Math.pow(1+l.j/100,-l.q))/(l.j/100):l.p*l.q),r:l.j,m:l.p,q:l.q}))].filter(d=>d.b>0).sort((a,b)=>b.r-a.r);
-  let months=0,int=0,def=0,B0=0,m0=0;
+  let months=0,int=0,def=0,B0=0,m0=0;const rows=[];
   while(D.some(d=>d.b>.01)&&months<360){
     const o=months;months++;
-    const B=S.renda+extraIn(o)-fixed(o)-parM(o)+ex;let left=B,need=0;
+    const B=S.renda+extraIn(o)-fixed(o)-parM(o)+ex;let left=B,need=0,paid=0;
     D.forEach(d=>{if(d.b<=.01)return;
       if(!d.card){const i=d.b*d.r/100;d.b+=i;int+=i}
       const m=(d.card||!(d.q>0))?Math.max(d.b*.15,Math.min(50,d.b)):d.m;const mm=Math.min(d.b,m);need+=mm;
-      const p=Math.min(mm,Math.max(left,0));d.b-=p;left-=p;if(!d.card&&d.q>0&&p>=mm-.01)d.q--;if(months===1)m0+=p;});
+      const p=Math.min(mm,Math.max(left,0));d.b-=p;left-=p;paid+=p;if(!d.card&&d.q>0&&p>=mm-.01)d.q--;if(months===1)m0+=p;});
     if(months===1)B0=B;
     if(need>B+.01&&!def)def=months;
-    if(left>0)D.filter(d=>d.b>.01).sort((a,b)=>b.r-a.r).forEach(d=>{const p=Math.min(d.b,left);d.b-=p;left-=p;});
+    if(left>0)D.filter(d=>d.b>.01).sort((a,b)=>b.r-a.r).forEach(d=>{const p=Math.min(d.b,left);d.b-=p;left-=p;paid+=p;});
     D.forEach(d=>{if(d.card&&d.b>.01){const i=d.b*d.r/100;d.b+=i;int+=i}if(d.b<=.01&&!d.done)d.done=months});
+    rows.push({o,B,paid,rest:sum(D,d=>Math.max(d.b,0))});
   }
-  return{months,int,B:B0,mins:m0,deficit:def>0,defMonth:def,ok:months<360,D,none:D.length===0};
+  return{months,int,B:B0,mins:m0,deficit:def>0,defMonth:def,ok:months<360,rows,D,none:D.length===0};
 }
 function when(m){const d=new Date();d.setMonth(d.getMonth()+m);return d.toLocaleDateString('pt-BR',{month:'long',year:'numeric'})}
 
@@ -381,6 +382,9 @@ function vPla(){
   <div class="row" style="margin-top:10px"><span class="m">Disponível este mês para dívidas</span><b class="${r.B<-.005?'wine':''}">${R(r.B)}</b></div></div>
   <h2>Ordem de pagamento</h2>
   <div class="c">${debts.map((d,i)=>`<div class="row"><div>${i+1}. ${d.n}<div class="m">juros ${d.r}% ao mês</div></div><b>${d.done?'quita em '+d.done+(d.done===1?' mês':' meses'):'não quita'}</b></div>`).join('')}</div>
+  <h2>Mês a mês</h2>
+  <div class="c"><table><tr><th>Mês</th><th>Livre</th><th>Pago</th><th>Resta</th></tr>${r.rows.slice(0,12).map(x=>`<tr><td>${fm(ym(x.o))}</td><td class="${x.B<-.005?'wine':''}">${R(x.B)}</td><td>${R(x.paid)}</td><td>${R(x.rest)}</td></tr>`).join('')}</table>
+  <div class="m" style="margin-top:12px">Livre = renda + extras − despesas − parcelas de cartão do mês. O plano usa todo esse valor nas dívidas, inclusive para adiantar parcelas de empréstimo.</div></div>
   <h2>O que fazer</h2>
   ${tips.map(t=>`<div class="tip ${t[0]}">${t[1]}</div>`).join('')}
   <h2>E se eu pagar mais por mês?</h2>
